@@ -7,8 +7,112 @@
 #include <arpa/inet.h>  // htons()
 #include <netinet/in.h> // struct sockaddr_in
 #include <sys/socket.h>
+int socket_desc;
 
+
+#include "server.h"
 #include "common.h"
+
+int main(int argc, char* argv[]) {
+
+    system("clear"); 
+    printTitle();
+
+    startServer();
+
+    exit(EXIT_SUCCESS); 
+}
+
+
+void startServer(){
+    int ret, recv_bytes;
+
+    //descrittori per socket e client
+
+    // setto i campi della struct sockaddr_in
+    struct sockaddr_in server_addr = {0}; //, client_addr = {0};
+    int sockaddr_len = sizeof(struct sockaddr_in); 
+
+    //inizializzo socket UDP 
+    socket_desc = socket(AF_INET, SOCK_DGRAM, 0);
+    if (socket_desc < 0)
+        handle_error("Could not create socket");
+
+    if (DEBUG) fprintf(stderr, "Socket created...\n");
+
+    // attivo SO_REUSEADDR per far ripartire velocemente il server da un crash
+    int reuseaddr_opt = 1;
+    ret = setsockopt(socket_desc, SOL_SOCKET, SO_REUSEADDR, &reuseaddr_opt, sizeof(reuseaddr_opt));
+    if (ret < 0)
+        handle_error("Cannot set SO_REUSEADDR option");
+
+    
+    server_addr.sin_addr.s_addr = INADDR_ANY;           //setto sin_addr.s_addr con INADDR_ANY per accettare connesioni da qualunque interfaccia
+    server_addr.sin_family      = AF_INET;              //setto sin_familyr con AF_INET per utilizzare il protocollo IPv4
+    server_addr.sin_port        = htons(SERVER_PORT);   // setto il byte order in modo inverso
+
+    // binding dell'indirizzo alla socket (devo castare server_addr in quanto è richiesta una struct di tipo sockaddr*)
+    ret = bind(socket_desc, (struct sockaddr*) &server_addr, sockaddr_len);
+    if (ret < 0)
+        handle_error("Cannot bind address to socket");
+
+    if (DEBUG) fprintf(stderr, "Binded address to socket...\n");
+
+    char buf[1024]; // buffer in cui andrò a scrivere il messaggio
+    size_t buf_len = sizeof(buf);
+    //int msg_len; 
+    memset(buf,0,buf_len); //setto il buffer tutto a 0
+
+    struct sockaddr_in client_addr;
+    sockaddr_len = sizeof(client_addr);
+    // attendo connessioni in modo sequenziale
+    while (1) {
+		
+        if (DEBUG) fprintf(stderr, "opening connection handler...\n");
+         
+
+        recv_bytes = 0;
+        do {
+            // ricevo i byte comunicati dal client e li metto nel buffer 
+            recv_bytes = recvfrom(socket_desc, buf, buf_len-1, 0,(struct sockaddr*) &client_addr, (socklen_t*) &sockaddr_len);
+            if (recv_bytes == -1 && errno == EINTR) continue; 
+            if (recv_bytes == -1) handle_error("Cannot read from the socket");
+            if (recv_bytes == 0) break;
+	    } while ( recv_bytes <= 0 ); // devo evitare la possibilità di messaggi letti parzialmente
+        
+        buf[recv_bytes] = '\0';
+        // formato comando da client numero_operazione::campi per quell'operazione
+
+        chooseOperation(buf, recv_bytes, client_addr, sockaddr_len);
+    
+
+    }
+}
+void sendRespone(char buf[], int bytes_left, struct sockaddr_in client_addr, int sockaddr_len){
+
+    int bytes_sent=0;
+    int ret=0;
+    while(ret<=0){ 
+        ret=sendto(socket_desc, buf, bytes_left, 0, (struct sockaddr*)&client_addr, sockaddr_len);
+        if(ret==-1 && errno==EINTR) continue;//lg: errore dovuto all'interruzione, riproviamo
+        if(ret==-1) handle_error("ERRORE NELLA SENDTO"); //lg: errore nella sendto
+        bytes_sent=ret; //lg: se invio andato bene, settiamo il numero di bytes_sent a ret
+    }
+
+}
+
+void chooseOperation(char buf[], int recv_bytes, struct sockaddr_in client_addr, int sockaddr_len){
+
+    char op = buf[0];
+
+    buf += 2;
+    recv_bytes -=2;
+
+    if(op == '1'){
+        authentication(buf, recv_bytes, client_addr, sockaddr_len);
+    }
+}
+
 
 void* connection_handler(int socket_desc) {
     int ret, recv_bytes, bytes_sent;
@@ -19,11 +123,9 @@ void* connection_handler(int socket_desc) {
     //int msg_len; 
     memset(buf,0,buf_len); //setto il buffer tutto a 0
 
-    char* quit_command = SERVER_COMMAND; //comando per terminare la connessione
-    size_t quit_command_len = strlen(quit_command);
-
     struct sockaddr_in client_addr;
     int sockaddr_len = sizeof(client_addr); 
+    
 
     // echo loop
     while (1) {
@@ -40,12 +142,6 @@ void* connection_handler(int socket_desc) {
         
         if (DEBUG) fprintf(stderr, "Messaggio di %d bytes...\n",recv_bytes);
 
-        // verifico se è stato mandato il messaggio di terminazione
-		if (recv_bytes == quit_command_len && !memcmp(buf, quit_command, quit_command_len)){
-
-            if (DEBUG) fprintf(stderr, "Received QUIT command...\n");
-                continue;
-         }
 
         // se non è il messaggio di terminazione lo rimando indietro come ack
         bytes_sent=0;
@@ -137,132 +233,48 @@ int file_authentication(char * username, char * password){
     return 0;
 }
 
-void authentication(int socket_desc){
-    //printf("sd: %d \n", socket_desc);
-    int ret, recv_bytes, bytes_sent;
-    char username[1024], password[1024];
-    size_t user_len = sizeof(username);
-    size_t pass_len = sizeof(password);
+void authentication(char buf[], int recv_bytes, struct sockaddr_in client_addr, int sockaddr_len){
 
-    time_t rawtime;
-    struct tm * timeinfo;
+    //time_t rawtime;
+    //struct tm * timeinfo;
 
-    char buf[1024]; // buffer in cui andrò a scrivere il messaggio
-    size_t buf_len = sizeof(buf);
-    //int msg_len; 
-    memset(buf,0,buf_len); //setto il buffer tutto a 0
 
-    char* quit_command = SERVER_COMMAND; //comando per terminare la connessione
-    size_t quit_command_len = strlen(quit_command);
 
-    struct sockaddr_in client_addr;
-    int sockaddr_len = sizeof(client_addr); 
-
-    // echo loop
-    while (1) {
-        
-        recv_bytes = 0;
-        do {
-            // ricevo i byte comunicati dal client sul suo username 
-            recv_bytes = recvfrom(socket_desc, username, user_len, 0,(struct sockaddr*) &client_addr, (socklen_t*) &sockaddr_len);
-            if (recv_bytes == -1 && errno == EINTR) continue; 
-            if (recv_bytes == -1) handle_error("Cannot read from the socket");
-            if (recv_bytes == 0) break;
-		} while ( recv_bytes <= 0 ); // devo evitare la possibilità di messaggi letti parzialmente
-
-        recv_bytes = 0;
-        do {
-            // ricevo i byte comunicati dal client sulla sua password 
-            recv_bytes = recvfrom(socket_desc, password, pass_len, 0,(struct sockaddr*) &client_addr, (socklen_t*) &sockaddr_len);
-            if (recv_bytes == -1 && errno == EINTR) continue; 
-            if (recv_bytes == -1) handle_error("Cannot read from the socket");
-            if (recv_bytes == 0) break;
-		} while ( recv_bytes <= 0 ); 
-        
-        
-
-       
-
-        //verifico se l'utente ha inserito dati corretti
-        char msg[1024];
-        if(file_authentication(username, password)){
-            sprintf(msg, "Login effettuato con successo");
-            time ( &rawtime );
-            timeinfo = localtime ( &rawtime );
-            printf("%s si è loggato %s \n", username, asctime(timeinfo));  
-            
-        }else{
-            sprintf(msg, "Dati errati, riprovare");
-        }
-        size_t msg_len = sizeof(msg);
-
-        
-              
-        // mando il responso del login
-        bytes_sent=0;
-        while ( bytes_sent < recv_bytes) {
-            ret = sendto(socket_desc, msg, msg_len, 0,(struct sockaddr*) &client_addr, sockaddr_len);
-            if (ret == -1 && errno == EINTR) continue;
-            if (ret == -1) handle_error("Cannot write to the socket");
-            bytes_sent += ret;
-        }
-        break;
-        
-
+    char* tok=strtok(buf,"::");// prendo lo username
+    if(DEBUG && tok==NULL) printf("problemi con tok\n");
+    
+    if(tok==NULL){ // se non riesco a prendere il nome allora input errato
+        if(DEBUG) printf("la stringa non ha il formato voluto, tok NULL");
+        return;
     }
-    return;
-}
-
-
-
-int main(int argc, char* argv[]) {
-
-    system("clear"); 
-    printTitle();
-
-    int ret;
-
-    //descrittori per socket e client
-    int socket_desc;
-
-    // setto i campi della struct sockaddr_in
-    struct sockaddr_in server_addr = {0}; //, client_addr = {0};
-    int sockaddr_len = sizeof(struct sockaddr_in); 
-
-    //inizializzo socket UDP 
-    socket_desc = socket(AF_INET, SOCK_DGRAM, 0);
-    if (socket_desc < 0)
-        handle_error("Could not create socket");
-
-    if (DEBUG) fprintf(stderr, "Socket created...\n");
-
-    // attivo SO_REUSEADDR per far ripartire velocemente il server da un crash
-    int reuseaddr_opt = 1;
-    ret = setsockopt(socket_desc, SOL_SOCKET, SO_REUSEADDR, &reuseaddr_opt, sizeof(reuseaddr_opt));
-    if (ret < 0)
-        handle_error("Cannot set SO_REUSEADDR option");
+    int username_len=strlen(tok);
+    char username[username_len+1]; 
+    if(sprintf(username,"%s", tok)<0) // ricavo lo username da buf
+        handle_error("sprintf error");
+    if(DEBUG) printf("username: %s\n", username);
 
     
-    server_addr.sin_addr.s_addr = INADDR_ANY;           //setto sin_addr.s_addr con INADDR_ANY per accettare connesioni da qualunque interfaccia
-    server_addr.sin_family      = AF_INET;              //setto sin_familyr con AF_INET per utilizzare il protocollo IPv4
-    server_addr.sin_port        = htons(SERVER_PORT);   // setto il byte order in modo inverso
-
-    // binding dell'indirizzo alla socket (devo castare server_addr in quanto è richiesta una struct di tipo sockaddr*)
-    ret = bind(socket_desc, (struct sockaddr*) &server_addr, sockaddr_len);
-    if (ret < 0)
-        handle_error("Cannot bind address to socket");
-
-    if (DEBUG) fprintf(stderr, "Binded address to socket...\n");
-
-    // attendo connessioni in modo sequenziale
-    while (1) {
-		
-        if (DEBUG) fprintf(stderr, "opening connection handler...\n");
-        
-        //gestisco le connessioni tramite connection_handler
-        authentication(socket_desc);
-
+    tok=strtok(NULL,"::");
+    if(DEBUG && tok==NULL) printf("PROBLEMI\n");
+    
+    if(tok==NULL){ //lg: se non riesco a prendere la password allora input errato
+        if(DEBUG) printf("la stringa non ha il formato voluto, tok NULL");
+        //Response_String(ACTION_INPUT_ERROR, client_addr, sockaddr_len);
+        return;
     }
-
-    exit(EXIT_SUCCESS); 
+    int password_len=strlen(tok);
+    char password[password_len+1];
+    if(sprintf(password,"%s", tok)<0)
+        handle_error("sprintf error"); 
+    if(DEBUG) printf("password: %s\n", password);
+    
+    if(file_authentication(username, password)) {
+        printf("Login successo, procedo ad invio messaggio \n");
+        buf = "Login effettuato con successo";
+        sendRespone(buf, strlen(buf)+1, client_addr, sockaddr_len);
+    }else{
+        buf = "Login fallito";
+        sendRespone(buf, strlen(buf)+1, client_addr, sockaddr_len);
+    }
 }
+
