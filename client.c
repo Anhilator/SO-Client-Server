@@ -16,13 +16,12 @@ void login(int socket_desc, struct sockaddr_in server_addr){
     memset(buf,0,buf_len);      
 
     int ret, bytes_sent,recv_bytes;
-
     // sequenza di login
     while (1) {
         char* quit_command = SERVER_COMMAND;
         size_t quit_command_len = strlen(quit_command);
 
-        printf("Enter username: ");
+        /*printf("Enter username: ");
 
         //Leggi una line da stdin
         if (fgets(buf, sizeof(buf), stdin) != (char*)buf) {
@@ -47,7 +46,9 @@ void login(int socket_desc, struct sockaddr_in server_addr){
         if (fgets(buf, sizeof(buf), stdin) != (char*)buf) {
             fprintf(stderr, "Error while reading from stdin, exiting...\n");
             exit(EXIT_FAILURE);
-        }
+        }*/
+
+        sprintf(buf, "1::Samuele::password1\n");
 
         msg_len = strlen(buf);
 
@@ -60,12 +61,6 @@ void login(int socket_desc, struct sockaddr_in server_addr){
             bytes_sent = ret;
         }
 
-        // può tornare utile più avanti
-		if (msg_len == quit_command_len && !memcmp(buf, quit_command, quit_command_len)){
-
-            if (DEBUG) fprintf(stderr, "Sent QUIT command ...\n");
-             break;
-        }
 
         // ricevo la risposta dal server
 	    recv_bytes = 0;
@@ -145,14 +140,15 @@ int main(int argc, char* argv[]) {
     server_addr.sin_addr.s_addr = inet_addr(SERVER_ADDRESS);   // setto l'indirizzo
     server_addr.sin_family      = AF_INET;                     // scelgo il protocollo Ipv4 
     server_addr.sin_port        = htons(SERVER_PORT);          // setto il byte order
-
-
-    
+    int op;
     
 
-    login(socket_desc, server_addr);
+    //printf("Loggato");
+    while(1){
+        printf("1 - Login \nSeleziona un operazione: ");
+        scanf("%d", &op);
 
-    printf("Loggato");
-    while(1);
+        if(op==1) login(socket_desc, server_addr);
+    }
     
 }
