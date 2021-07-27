@@ -9,7 +9,7 @@
 #define DEBUG           0   // display debug messages
 #define MAX_CONN_QUEUE  3   // max number of connections the server can queue
 #define SERVER_ADDRESS  "127.0.0.1"
-#define SERVER_COMMAND  "QUIT\n"
+#define SERVER_COMMAND  "QUIT"
 #define SERVER_PORT     2015
 
 #endif
