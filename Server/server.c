@@ -12,7 +12,7 @@
 #include "linked_list.h"
 #include "server.h"
 #include "common.h"
-#include "private_chat.h"
+#include "private_chat_struct.h"
 
 
 int socket_desc;
@@ -282,21 +282,6 @@ void sendRespone(char buf[], struct sockaddr_in client_addr, int sockaddr_len){
 
 }
 
-// scelgo l'operazione da compiere in base alla richiesta del client
-void chooseOperation(char buf[], int recv_bytes, struct sockaddr_in client_addr, int sockaddr_len){
-
-    char op = buf[0];
-
-    buf += 2;
-    recv_bytes -=2;
-
-    if(op == '1'){
-        authentication(buf, recv_bytes, client_addr, sockaddr_len);
-    } else if(op == '4'){
-        logout(client_addr, sockaddr_len);
-    }
-}
-
 
 void* connection_handler(int socket_desc) {
     int ret, recv_bytes, bytes_sent;
@@ -418,6 +403,23 @@ int file_authentication(char * username, char * password){
     return 0;
 }
 
+// scelgo l'operazione da compiere in base alla richiesta del client
+void chooseOperation(char buf[], int recv_bytes, struct sockaddr_in client_addr, int sockaddr_len){
+
+    char op = buf[0];
+
+    buf += 2;
+    recv_bytes -=2;
+
+    if(op == '1'){
+        authentication(buf, recv_bytes, client_addr, sockaddr_len);
+    } else if(op == '2'){
+        signin(buf, recv_bytes, client_addr, sockaddr_len);
+    }else if(op == '4'){
+        logout(client_addr, sockaddr_len);
+    }
+}
+
 
 // OPERAZIONI SELEZIONABILI DAL CLIENT  //
 
@@ -476,7 +478,8 @@ void authentication(char buf[], int recv_bytes, struct sockaddr_in client_addr, 
             if (DEBUG) printf("faccio operazioni di log\n");
             addNewLogin(user, client_addr, sockaddr_len);// aggiungo l'utente alla lista di utenti online
             
-            sendRespone("Login effettuato con successo", client_addr, sockaddr_len);// mando il messaggio di conferma del login
+            sprintf(buf, "Login effettuato con successo, bentornato %s", username);
+            sendRespone(buf, client_addr, sockaddr_len);// mando il messaggio di conferma del login
             return;
         }
     }
@@ -485,6 +488,51 @@ void authentication(char buf[], int recv_bytes, struct sockaddr_in client_addr, 
         sendRespone("Login fallito", client_addr, sockaddr_len);// rispondo con l'errore al client
         return;
     }
+}
+
+//effettua la registrazione di un nuovo utente
+void signin(char buf[], int recv_butes, struct sockaddr_in client_addr, int sockaddr_len){
+    char* tok=strtok(buf,"::");// prendo lo username
+    if(DEBUG && tok==NULL) printf("problemi con tok\n");
+    
+    if(tok==NULL){ // se non riesco a prendere il nome allora input errato
+        if(DEBUG) printf("la stringa non ha il formato voluto, tok NULL");
+        return;
+    }
+    int username_len=strlen(tok);
+    char username[username_len+1]; 
+    if(sprintf(username,"%s", tok)<0) // ricavo lo username da buf
+        handle_error("sprintf error");
+    if(DEBUG) printf("username: %s\n", username);
+
+    
+    tok=strtok(NULL,"::");
+    if(DEBUG && tok==NULL) printf("errori con sprintf\n");
+    
+    if(tok==NULL){ 
+        if(DEBUG) printf("la stringa non ha il formato voluto, tok NULL");
+        sendRespone("Stringa malformata", client_addr, sockaddr_len);
+        return;
+    }
+    int password_len=strlen(tok);
+    char password[password_len+1];
+    if(sprintf(password,"%s", tok)<0)
+        handle_error("sprintf error"); 
+    if(DEBUG) printf("password: %s\n", password);
+
+    // provo a inizializzare l'utente
+    User* user = initUser(username, password);
+
+    // se initUser mi ha tornato NULL allora l'utente già esiste
+    if(user == NULL){
+        sendRespone("Username già in uso, riprovare con un altro username", client_addr, sockaddr_len);
+        return;
+    }
+
+    //altrimenti avremo che la registrazione è andata a buon fine
+    sendRespone("Nuovo utente creato correttamente", client_addr, sockaddr_len);
+
+
 }
 
 // effettua il logout di un utente che l'ha richiesto

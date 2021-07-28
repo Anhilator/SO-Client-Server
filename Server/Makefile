@@ -5,7 +5,7 @@ AR=ar
 OBJS=linked_list.o\
 
 HEADERS=linked_list.h\
-    private_chat.h\
+    private_chat_struct.h\
     server.h\
     common.h\
 

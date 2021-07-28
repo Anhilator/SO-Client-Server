@@ -12,12 +12,12 @@ BINS=client\
 
 .phony: clean all
 
-all:	server 
+all:	client
 
 %.o:	%.c $(HEADERS)
 	$(CC) $(CCOPTS) -c -o $@ $<
 	
-server: server.c $(OBJS)
+client: client.c $(OBJS)
 	$(CC) $(CCOPTS) -o $@ $^
 
 

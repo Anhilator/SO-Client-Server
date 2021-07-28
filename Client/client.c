@@ -95,7 +95,7 @@ void login(int socket_desc, struct sockaddr_in server_addr,char* logged){
         sender(log_cmd,log_len,socket_desc,server_addr);
         reciever(server_response,sizeof(server_response), socket_desc);
         printf("Server response: %s\n", server_response);
-        if(strcmp(server_response, "Login effettuato con successo") == 0) {
+        if(strcmp(server_response, "Login effettuato con successo") >= 0) {
             *logged = 1;
             return;
         }
