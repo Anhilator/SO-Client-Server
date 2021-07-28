@@ -1,5 +1,6 @@
 #include <errno.h>
 #include <stdio.h>
+#include <assert.h>
 #include <stdlib.h>
 #include <string.h>
 #include <time.h>
@@ -7,21 +8,159 @@
 #include <arpa/inet.h>  // htons()
 #include <netinet/in.h> // struct sockaddr_in
 #include <sys/socket.h>
-int socket_desc;
-
-
 #include "server.h"
 #include "common.h"
+#include "private_chat.h"
+#include "linked_list.c"
+
+int socket_desc;
+Database database;
+
+
 
 int main(int argc, char* argv[]) {
 
     system("clear"); 
     printTitle();
 
+    setupDatabase();
+
     startServer();
 
     exit(EXIT_SUCCESS); 
 }
+
+void setupDatabase(){
+    database.num_users=0; // setto il numero di utenti a zero
+    List_init(&database.users); //inizializzo la lista degli utenti
+    List_init(&database.login); //inizializzo la lista dei login
+    fileRead_Database(&database);
+}
+
+//Leggo dal file locale tutti gli utenti e li inserisco nella struttura dati database
+int fileRead_Database(Database* database){
+    FILE * fl;
+    long fl_size;
+    char * buffer;
+    size_t res;
+        
+    char username[50]; 
+    char password[50];
+
+    fl = fopen ( "user.txt" , "r+" );
+    if (fl==NULL) {
+        handle_error("Errore apertura del file \n");
+    }
+
+    fseek (fl , 0 , SEEK_END);
+    fl_size = ftell (fl);
+    rewind (fl);
+
+    buffer = (char*) malloc (sizeof(char)*fl_size);
+    
+    res = fread (buffer,1,fl_size,fl);
+    if (res != fl_size) {
+        handle_error("Errore in lettura file");
+    }
+
+    char * strtok_res;
+    strtok_res = strtok(buffer, "::");
+    int i=0;
+    while (strtok_res != NULL)
+    {
+        if (DEBUG) printf ("%s \n", strtok_res);
+       
+        if(i==0) {
+            sprintf(username, "%s", strtok_res);
+            i++;
+        }else{
+            sprintf(password, "%s", strtok_res);
+            User* user = initUser(username, password);
+            i--;
+        }
+        
+        strtok_res = strtok (NULL, "::\n");
+    }
+
+    //Manca la lettura delle chat per ogni utente
+
+    fclose (fl);
+    free (buffer);
+}
+
+
+
+//Inizializzo un utente con un certo username e una certa password
+User* initUser(char username[], char password[]){
+    assert(username); // controllo che username e password non siano null
+    assert(password);
+    int username_len=strlen(username);
+    int password_len=strlen(password);
+    // controlliamo se l'utente con quel nome già esiste
+    /*if(User_findByUsername(&database.users, username)!=NULL){ // ritorna NULL se non lo trova
+        if(DEBUG) printf("utente %s già esiste\n", username);
+        return NULL;
+    }
+    //controllo sul rispetto delle size di password e username
+    assert(password_len<PASSWORD_SIZE && "password too long");
+    assert(username_len<USERNAME_SIZE && "username too long");
+    assert(username_len>0 && "username without char");
+    assert(password_len>0 && "password without char");*/
+
+    //creo l'utente
+    User* user=(User*)calloc(1,sizeof(User));
+    user->list.prev=0;
+    user->list.next=0;
+    
+    // scrivo username e password in User
+    if(sprintf(user->username, "%s", username)<0)
+        handle_error("errore nella sprintf");
+    if(sprintf(user->password, "%s", password)<0)
+        handle_error("errore nella sprintf");
+    
+    //inizializza la lista delle chat
+    List_init(&(user->chats));
+    user->num_chats=0; //utente viene creato senza chat
+
+    //utente loggato
+    user->logged=0;
+    
+    //aggiunta dell'utente al database
+    List_insert(&(database.users), database.users.last, (ListItem*) user);
+    database.num_users++;
+    if(DEBUG){
+        printf("Utente creato\n");
+        //Database_printUser(user);
+    }
+
+
+    
+    return user;
+}
+
+// cerco un utente nella lista di un database e lo restituisco se lo trovo
+User* User_findByUsername(ListHead* head, const char* username){
+    assert(head && "lista vuota");
+    assert(username && "username non presente");
+    User* user=(User*)head->first;
+    User* aux=user;
+    
+    while(aux!=NULL){
+        user=aux;
+        aux=(User*)(user->list.next);
+        int username_len=strlen(user->username);
+        if(DEBUG){
+            printf("%s %d e %s %d\n", username, (int)strlen(username), user->username, username_len);
+        }
+        if(username_len!=strlen(username)) continue;
+
+        if(!memcmp(user->username, username, username_len)) return user;
+        
+    }
+    fflush(stdout);
+    return NULL;
+}
+
 
 
 void startServer(){
@@ -88,15 +227,33 @@ void startServer(){
 
     }
 }
-void sendRespone(char buf[], int bytes_left, struct sockaddr_in client_addr, int sockaddr_len){
 
+// aggiorno la struttura dati del database inserendo un utente che risulta loggato e quindi online
+void addNewLogin(User* user,struct sockaddr_in client_addr, int sockaddr_len){
+    
+    LoginListItem* login=(LoginListItem*)calloc(1,sizeof(LoginListItem));
+    login->list.next=0;
+    login->list.prev=0;
+    login->user=user;
+    login->client_addr=client_addr;
+    login->sockaddr_len=sockaddr_len;
+
+    login->user->logged=1;// setto user loggato
+    //if(DEBUG) printf("login effettuato\n");
+    //(if(DEBUG) User_print(login->user);
+    // inserisco il nuovo utente loggato nella lista di utenti online del database
+    List_insert(&(database.login), database.login.last, (ListItem*)login);
+}
+
+void sendRespone(char buf[], struct sockaddr_in client_addr, int sockaddr_len){
+    int bytes_left = strlen(buf)+1;
     int bytes_sent=0;
     int ret=0;
     while(ret<=0){ 
         ret=sendto(socket_desc, buf, bytes_left, 0, (struct sockaddr*)&client_addr, sockaddr_len);
-        if(ret==-1 && errno==EINTR) continue;//lg: errore dovuto all'interruzione, riproviamo
-        if(ret==-1) handle_error("ERRORE NELLA SENDTO"); //lg: errore nella sendto
-        bytes_sent=ret; //lg: se invio andato bene, settiamo il numero di bytes_sent a ret
+        if(ret==-1 && errno==EINTR) continue;
+        if(ret==-1) handle_error("ERRORE NELLA SENDTO"); 
+        bytes_sent=ret; 
     }
 
 }
@@ -257,7 +414,7 @@ void authentication(char buf[], int recv_bytes, struct sockaddr_in client_addr, 
     tok=strtok(NULL,"::");
     if(DEBUG && tok==NULL) printf("PROBLEMI\n");
     
-    if(tok==NULL){ //lg: se non riesco a prendere la password allora input errato
+    if(tok==NULL){ 
         if(DEBUG) printf("la stringa non ha il formato voluto, tok NULL");
         //Response_String(ACTION_INPUT_ERROR, client_addr, sockaddr_len);
         return;
@@ -268,13 +425,33 @@ void authentication(char buf[], int recv_bytes, struct sockaddr_in client_addr, 
         handle_error("sprintf error"); 
     if(DEBUG) printf("password: %s\n", password);
     
-    if(file_authentication(username, password)) {
-        printf("Login successo, procedo ad invio messaggio \n");
-        buf = "Login effettuato con successo";
-        sendRespone(buf, strlen(buf)+1, client_addr, sockaddr_len);
-    }else{
-        buf = "Login fallito";
-        sendRespone(buf, strlen(buf)+1, client_addr, sockaddr_len);
+
+    //vedo se c'è l'utente con quel username nel database
+    User* user=User_findByUsername(&database.users, username);
+    
+    
+    //controllo se l'utente è presente, se le lunghezze delle password coincidono e se le password stesse coincidono
+    if(user && strlen(user->password)==password_len && !memcmp(user->password, password, password_len)){
+        //controllo prima se è già loggato
+        if(user->logged){
+            
+            if(DEBUG) printf("utente già loggato\n");
+            sendRespone("Utente già loggato \n", client_addr, sockaddr_len);
+            return;
+        }
+        else{ // se non ero loggato aggiorno il database e notifico il client
+            
+            if (DEBUG) printf("faccio operazioni di log\n");
+            addNewLogin(user, client_addr, sockaddr_len);// aggiungo l'utente alla lista di utenti online
+            
+            sendRespone("Login effettuato con successo", client_addr, sockaddr_len);// mando il messaggio di conferma del login
+            return;
+        }
+    }
+    else{ //username e password sbagliati
+        
+        sendRespone("Login fallito", client_addr, sockaddr_len);// rispondo con l'errore al client
+        return;
     }
 }
 
