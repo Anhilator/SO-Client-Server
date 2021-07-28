@@ -8,10 +8,12 @@
 #include <arpa/inet.h>  // htons()
 #include <netinet/in.h> // struct sockaddr_in
 #include <sys/socket.h>
+
+#include "linked_list.h"
 #include "server.h"
 #include "common.h"
 #include "private_chat.h"
-#include "linked_list.c"
+
 
 int socket_desc;
 Database database;
@@ -34,7 +36,7 @@ void setupDatabase(){
     database.num_users=0; // setto il numero di utenti a zero
     List_init(&database.users); //inizializzo la lista degli utenti
     List_init(&database.login); //inizializzo la lista dei login
-    fileRead_Database(&database);
+    fileRead_Database(&database);//vado a leggermi gli utenti dal disco e ricreo il database
 }
 
 //Leggo dal file locale tutti gli utenti e li inserisco nella struttura dati database
@@ -89,6 +91,7 @@ int fileRead_Database(Database* database){
 }
 
 
+//  OPERAZIONI SULLE STRUTTURE DATI //
 
 //Inizializzo un utente con un certo username e una certa password
 User* initUser(char username[], char password[]){
@@ -97,12 +100,12 @@ User* initUser(char username[], char password[]){
     int username_len=strlen(username);
     int password_len=strlen(password);
     // controlliamo se l'utente con quel nome già esiste
-    /*if(User_findByUsername(&database.users, username)!=NULL){ // ritorna NULL se non lo trova
+    if(User_findByUsername(&database.users, username)!=NULL){ // ritorna NULL se non lo trova
         if(DEBUG) printf("utente %s già esiste\n", username);
         return NULL;
     }
     //controllo sul rispetto delle size di password e username
-    assert(password_len<PASSWORD_SIZE && "password too long");
+   /* assert(password_len<PASSWORD_SIZE && "password too long");
     assert(username_len<USERNAME_SIZE && "username too long");
     assert(username_len>0 && "username without char");
     assert(password_len>0 && "password without char");*/
@@ -133,8 +136,6 @@ User* initUser(char username[], char password[]){
         //Database_printUser(user);
     }
 
-
-    
     return user;
 }
 
@@ -163,6 +164,28 @@ User* User_findByUsername(ListHead* head, const char* username){
 
 
 
+// cerco un utente che ha effettuato il login nella lista dei login tramite il sockadrr_in
+LoginListItem* LoginListItem_findBySockaddr_in(ListHead* head, struct sockaddr_in client_addr, int sockaddr_len){
+    assert(head && "lista vuota");
+    assert(head->first && "lista vuota");
+
+
+    LoginListItem* login=(LoginListItem*)head->first;
+    LoginListItem* aux=login;
+    
+    while(aux!=NULL){
+        
+        login=aux;
+        aux=(LoginListItem*)(login->list.next);
+
+        if(sockaddr_len!=login->sockaddr_len) continue;
+        
+        if(!memcmp(&(login->client_addr), &client_addr, sockaddr_len)) return login;
+    }
+    return NULL;
+}
+
+// faccio partire il server mettendolo in ascolto sulla porta 
 void startServer(){
     int ret, recv_bytes;
 
@@ -245,6 +268,7 @@ void addNewLogin(User* user,struct sockaddr_in client_addr, int sockaddr_len){
     List_insert(&(database.login), database.login.last, (ListItem*)login);
 }
 
+// invio una risposta contenuta in bu al client
 void sendRespone(char buf[], struct sockaddr_in client_addr, int sockaddr_len){
     int bytes_left = strlen(buf)+1;
     int bytes_sent=0;
@@ -258,6 +282,7 @@ void sendRespone(char buf[], struct sockaddr_in client_addr, int sockaddr_len){
 
 }
 
+// scelgo l'operazione da compiere in base alla richiesta del client
 void chooseOperation(char buf[], int recv_bytes, struct sockaddr_in client_addr, int sockaddr_len){
 
     char op = buf[0];
@@ -267,6 +292,8 @@ void chooseOperation(char buf[], int recv_bytes, struct sockaddr_in client_addr,
 
     if(op == '1'){
         authentication(buf, recv_bytes, client_addr, sockaddr_len);
+    } else if(op == '4'){
+        logout(client_addr, sockaddr_len);
     }
 }
 
@@ -320,6 +347,7 @@ void* connection_handler(int socket_desc) {
     return NULL;
 }
 
+// stampa il titolo 
 void printTitle(){
     
     char *filename = "title_server.txt";
@@ -390,6 +418,10 @@ int file_authentication(char * username, char * password){
     return 0;
 }
 
+
+// OPERAZIONI SELEZIONABILI DAL CLIENT  //
+
+// utilizzando i dati forniti dal cliente, prova ad effettuare un'autenticazione nel database
 void authentication(char buf[], int recv_bytes, struct sockaddr_in client_addr, int sockaddr_len){
 
     //time_t rawtime;
@@ -455,3 +487,21 @@ void authentication(char buf[], int recv_bytes, struct sockaddr_in client_addr, 
     }
 }
 
+// effettua il logout di un utente che l'ha richiesto
+void logout(struct sockaddr_in client_addr, int sockaddr_len){
+    // vedo se il sockaddr_in del cliente che cerca di fare logout è attualmente loggato
+    LoginListItem* login=LoginListItem_findBySockaddr_in(&database.login, client_addr, sockaddr_len);
+
+    if(login==NULL){// se non l'ho trovato vuol dire che non era ancora loggato
+
+        sendRespone("Utente non ancora loggato, impossibile effetuare logout", client_addr, sockaddr_len);
+        return;
+    }
+    
+    login->user->logged=0;// imposto l'utente come non loggato
+    List_detach(&database.login, (ListItem*)login); // tolgo l'oggetto di tipo login dell'utente che ha fatto logout dalla lista del database
+
+    sendRespone("Logout effettuato con successo", client_addr, sockaddr_len);
+
+    free(login); // dealoco login
+}
