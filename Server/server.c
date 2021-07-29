@@ -539,9 +539,9 @@ void signin(char buf[], int recv_butes, struct sockaddr_in client_addr, int sock
         handle_error("Errore apertura del file \n");
     }
 
-    fprintf(fl, "%s", "User::passowrd\n");
+    fprintf(fl, "%s::%s\n", username, password);
     fclose(fl);
-
+    return;
 
 }
 
