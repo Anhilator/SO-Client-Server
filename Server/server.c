@@ -492,6 +492,7 @@ void authentication(char buf[], int recv_bytes, struct sockaddr_in client_addr, 
 
 //effettua la registrazione di un nuovo utente
 void signin(char buf[], int recv_butes, struct sockaddr_in client_addr, int sockaddr_len){
+    FILE * fl;
     char* tok=strtok(buf,"::");// prendo lo username
     if(DEBUG && tok==NULL) printf("problemi con tok\n");
     
@@ -531,6 +532,15 @@ void signin(char buf[], int recv_butes, struct sockaddr_in client_addr, int sock
 
     //altrimenti avremo che la registrazione è andata a buon fine
     sendRespone("Nuovo utente creato correttamente", client_addr, sockaddr_len);
+    
+    //procedo a scrivere le credenziali del nuovo utente su disco    
+    fl = fopen ( "user.txt" , "a" );
+    if (fl==NULL) {
+        handle_error("Errore apertura del file \n");
+    }
+
+    fprintf(fl, "%s", "User::passowrd\n");
+    fclose(fl);
 
 
 }
