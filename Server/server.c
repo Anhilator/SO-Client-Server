@@ -41,26 +41,27 @@ void setupDatabase(){
 
 //Leggo dal file locale tutti gli utenti e li inserisco nella struttura dati database
 int fileRead_Database(Database* database){
-    FILE * fl;
+    FILE * users;
     long fl_size;
     char * buffer;
     size_t res;
-        
+    int num;
+
     char username[50]; 
     char password[50];
 
-    fl = fopen ( "user.txt" , "r+" );
-    if (fl==NULL) {
+    users = fopen ( "user.txt" , "r+" );
+    if (users==NULL) {
         handle_error("Errore apertura del file \n");
     }
 
-    fseek (fl , 0 , SEEK_END);
-    fl_size = ftell (fl);
-    rewind (fl);
+    fseek (users , 0 , SEEK_END);
+    fl_size = ftell (users);
+    rewind (users);
 
     buffer = (char*) malloc (sizeof(char)*fl_size);
     
-    res = fread (buffer,1,fl_size,fl);
+    res = fread (buffer,1,fl_size,users);
     if (res != fl_size) {
         handle_error("Errore in lettura file");
     }
@@ -82,12 +83,148 @@ int fileRead_Database(Database* database){
         }
         
         strtok_res = strtok (NULL, "::\n");
+        num++;
     }
 
     //Manca la lettura delle chat per ogni utente
 
-    fclose (fl);
+    FILE* chats = fopen("chat.txt", "r");
+    if(chats==NULL){// se file_chat non esiste, è inutile leggere le chat 
+        if(DEBUG) printf("chat.txt non disponibile\n");
+        if(fclose(chats)==EOF)  
+            handle_error("fclose di user.txt");
+        printf("Lettura da disco completata\n");
+        return num; 
+    }
+
+    //mi guardo un utente per volta e recupero le sue chat
+    User* user=(User*)database->users.first;
+    User* aux=user;
+    while(aux!=NULL){
+        user=aux;
+        aux=(User*)user->list.next;
+        readFile_Chats(user, chats); //mi leggo le chat di questo utente
+    }
+
+    if(fclose(users)==EOF) 
+        handle_error("fclose di user.txt");
+    if(fclose(chats)==EOF)
+        handle_error("fclose di chats.txt");
     free (buffer);
+    return num;
+}
+
+int readFile_Chats(User* user, FILE* chats){
+    
+
+    int num_chats=0;
+    if(fscanf(chats, "%d\n", &num_chats)==EOF)  //leggo quante chat ha un dato utente nel file
+        handle_error("chats non ha la forma desiderata");
+    char buffer[40+40+4+1+1+1]; // username + username + 4*:: + num_messaggi + \n + \0
+    char sender[40];
+    char receiver[40];
+    int n_message;
+    for(int i=0; i<num_chats; i++){
+        if(fgets(buffer, 40, chats )==NULL){ //lg: leggo i nomi degli utenti della chat
+            handle_error("problemi nella fgets");
+        }
+        strtok(buffer, "\n");
+        if(1) 
+            printf("stringa letta: %s\n", buffer);
+        
+        //uso i delimitatori per estrarre sender, receiver e n_message
+        
+        char* tok=strtok(buffer, "::");// ottengo il primo nome
+        assert(tok && "stringhe nel file di lettura non corrette");
+        if(sprintf(sender, "%s", tok)<0) //scrivo il primo nome in sender
+            handle_error("errore nella sprintf");
+        
+        tok=strtok(NULL, "::");//lg: ottengo il secondo nome
+        assert(tok && "stringhe nel file di lettura non corrette");
+        if(sprintf(receiver, "%s", tok)<0)// scrivo il secondo nome in receiver
+            handle_error("errore nella sprintf");
+        
+        tok=strtok(NULL, "::");
+        assert(tok && "stringhe nel file di lettura non corrette");
+        n_message = atoi(tok);
+
+        User* symmetric_user =User_findByUsername(&database.users, receiver); //mi accerto che il receiver sia presente nel database
+                                                           
+        assert(symmetric_user && "other_user dovrebbe essere stato già inserito nel database");
+        
+        //verifico che il sender coincide con l'user passato come parametro
+        if(strcmp(sender, user->username)){
+            handle_error("sender e nome utente di user non coincidono");
+        }
+
+        //creo un oggetto chat con i dati ricavati dal file chat
+        // inizializzo una chat tra sender e receiver, la funzione mi tornerà le due chat in entrambi i versi
+        ChatListItem** chat= initChat(user, symmetric_user); 
+                                                                
+        ChatListItem* chat_sender;
+        if(chat==NULL){// se chat è null, allora la chat già esisteva (significa che abbiamo letto la chat per l'altro utente)
+            // allora la otteniamo con una find, dati gli utenti
+            chat_sender=ChatListItem_findByUsers(user, symmetric_user);
+        }
+        else{
+            chat_sender =chat[0]; //mi prendo la chat del sender da chat
+            free(chat);
+        }
+        
+        chat_sender->num_messages=n_message;
+
+        if(DEBUG) printf("\nsto per fare readMessage sulla chat %s-%s %d\n", sender, receiver, n_message);
+        
+        for(int i=0; i< chat_sender->num_messages; i++){ // itero sui messaggi
+            Database_readOneMessage(chat_sender, chats);
+        }
+    }
+    return num_chats;    
+}
+
+
+int Database_readOneMessage(ChatListItem* chat, FILE* file_chat){
+    assert(chat && "chat in input è nulla");
+    assert(file_chat && "file_chat in input è nullo");
+    char buf[1024];
+    char* sent;
+
+    MessageListItem* message_list_item=(MessageListItem*)calloc(1, sizeof(MessageListItem));
+    Message* message=(Message*)calloc(1, sizeof(Message));
+    List_insert(&chat->messages, chat->messages.last, (ListItem*) message_list_item);
+        
+    
+    message_list_item->message=message;
+
+    if(fgets(buf,1024, file_chat)==NULL){//leggiamo il carattere che indica se il messaggio è stato inviato o ricevuto
+        handle_error("problemi nella prima fscanf in readMeesage");
+    }
+    char* tok=strtok(buf, "::");
+    assert(tok && "stringhe nel file di lettura non corrette");
+    sent = tok;
+    message_list_item->sent=*sent;
+
+    printf("sent vale %s\n", sent);
+        
+    tok=strtok(NULL, "::");
+
+    //rimuovo \n da tok
+    strtok(tok, "\n");
+    
+    assert(tok && "stringhe nel file di lettura non corrette");
+    if(sprintf(message->message, "%s", tok)<0)// scrivo il messaggio
+        handle_error("errore nella sprintf");
+
+    
+    
+    if(DEBUG) printf("sent vale %s\n", sent);
+
+
+    message->len_message = strlen(message->message);
+    
+    if(DEBUG) printf("lettura fatta\n");
+    printf("message: %s, message_len: %d\n", message->message, message->len_message);
+    return 0;
 }
 
 
@@ -139,6 +276,64 @@ User* initUser(char username[], char password[]){
     return user;
 }
 
+// Inizializzo una chat fornendo in ingresso un sender e un receiver
+ChatListItem** initChat(User* sender, User* receiver){
+    ListItem* data_user;
+    
+    if(DEBUG) 
+        printf("certo sender nel database\n");
+        
+    //mi accerto che il sender sia nel database
+    data_user = List_find(&(database.users),(ListItem*)sender); 
+    assert(data_user && "user1 not in database");
+
+    if(DEBUG) 
+        printf("certo utente 2 nel database\n");
+
+    // mi accerto che il receiver sia nel database
+    data_user = List_find(&(database.users),(ListItem*)receiver); 
+    assert(data_user && "user2 not in database");
+
+    if(ChatListItem_findByUsers(sender, receiver)!=NULL){// se entro nell'if, la chat già esiste
+        if(DEBUG) printf("chat tra %s e %s già esiste\n", sender->username, receiver->username);
+        return NULL;
+    }
+
+    ChatListItem* chat_sender=(ChatListItem*)calloc(1,sizeof(ChatListItem));
+    ChatListItem* chat_receiver=(ChatListItem*)calloc(1,sizeof(ChatListItem));
+
+    // inizializzo il sender
+    chat_sender->list.prev=0;
+    chat_sender->list.next=0;
+    List_init(&(chat_sender->messages));//lg: inizializzo la lista dei messaggi letti
+    chat_sender->sender= sender; //imposto il sender della chat
+    chat_sender->receiver=receiver; //imposti il receiver della chat
+    chat_sender->num_messages=0; 
+    sender->num_chats++; //incremento numero delle chat dell'utente
+    chat_sender->other_chat=chat_receiver;
+    
+
+    //inizializzo il receiver
+    chat_receiver->list.prev=0;
+    chat_receiver->list.next=0;
+    List_init(&(chat_receiver->messages));
+    chat_receiver->sender=receiver;
+    chat_receiver->receiver=sender;
+    chat_receiver->num_messages=0;
+    receiver->num_chats++;
+    chat_receiver->other_chat=chat_sender;
+
+    // inserisco le chat nel database
+    List_insert(&(sender->chats),sender->chats.last, (ListItem*)chat_sender);
+    List_insert(&(receiver->chats),receiver->chats.last, (ListItem*)chat_receiver);
+    
+    // chat contenente le due chat simmetriche da ritornare
+    ChatListItem** chat=(ChatListItem**)calloc(2,sizeof(ChatListItem*));
+    chat[0]=chat_sender;
+    chat[1]=chat_receiver;
+    return chat; // da deallocare
+}
+
 // cerco un utente nella lista di un database e lo restituisco se lo trovo
 User* User_findByUsername(ListHead* head, const char* username){
     assert(head && "lista vuota");
@@ -163,6 +358,32 @@ User* User_findByUsername(ListHead* head, const char* username){
 }
 
 
+ChatListItem* ChatListItem_findByUser(ListHead* head, User* receiver){
+    assert(head && "lista vuota");
+    //assert(head->first && "lista vuota");
+    assert(receiver && "receiver non presente");
+
+    //User* user=(User*)head->first;
+    ChatListItem* chat=(ChatListItem*)head->first;
+    ChatListItem* aux=chat;
+    if(DEBUG) printf("sto per entrare nel while\n");
+    
+    while(aux!=NULL){
+        chat=aux;
+        aux=(ChatListItem*)(chat->list.next);
+        if(chat->receiver==receiver) return chat;
+        
+    }
+    if(DEBUG) printf("sono uscito dal while\n");
+    return NULL;
+}
+
+ChatListItem* ChatListItem_findByUsers(User* sender, User* receiver){
+    assert(sender && "sender is NULL");
+    assert(receiver && "receiver is NULL");
+    return ChatListItem_findByUser(&(sender->chats), receiver);
+
+}
 
 // cerco un utente che ha effettuato il login nella lista dei login tramite il sockadrr_in
 LoginListItem* LoginListItem_findBySockaddr_in(ListHead* head, struct sockaddr_in client_addr, int sockaddr_len){
