@@ -1,10 +1,14 @@
-1
+2
 Samuele::Jose::2
 s::ciao Jose
 r::ciao Samu
+Samuele::Lucone::1
+s::ciao Lu
 1
 Jose::Samuele::2
 r::ciao Jose
 s::ciao Samu
-0
+1
+Lucone::Samuele::1
+r::ciao Lu
 0

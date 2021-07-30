@@ -125,7 +125,7 @@ int readFile_Chats(User* user, FILE* chats){
     char receiver[40];
     int n_message;
     for(int i=0; i<num_chats; i++){
-        if(fgets(buffer, 40, chats )==NULL){ //lg: leggo i nomi degli utenti della chat
+        if(fgets(buffer, 40, chats )==NULL){ // leggo i nomi degli utenti della chat
             handle_error("problemi nella fgets");
         }
         strtok(buffer, "\n");
@@ -139,7 +139,7 @@ int readFile_Chats(User* user, FILE* chats){
         if(sprintf(sender, "%s", tok)<0) //scrivo il primo nome in sender
             handle_error("errore nella sprintf");
         
-        tok=strtok(NULL, "::");//lg: ottengo il secondo nome
+        tok=strtok(NULL, "::");// ottengo il secondo nome
         assert(tok && "stringhe nel file di lettura non corrette");
         if(sprintf(receiver, "%s", tok)<0)// scrivo il secondo nome in receiver
             handle_error("errore nella sprintf");
@@ -204,7 +204,7 @@ int Database_readOneMessage(ChatListItem* chat, FILE* file_chat){
     sent = tok;
     message_list_item->sent=*sent;
 
-    printf("sent vale %s\n", sent);
+    //printf("sent vale %s\n", sent);
         
     tok=strtok(NULL, "::");
 
@@ -223,7 +223,7 @@ int Database_readOneMessage(ChatListItem* chat, FILE* file_chat){
     message->len_message = strlen(message->message);
     
     if(DEBUG) printf("lettura fatta\n");
-    printf("message: %s, message_len: %d\n", message->message, message->len_message);
+    //printf("message: %s, message_len: %d\n", message->message, message->len_message);
     return 0;
 }
 
@@ -305,7 +305,7 @@ ChatListItem** initChat(User* sender, User* receiver){
     // inizializzo il sender
     chat_sender->list.prev=0;
     chat_sender->list.next=0;
-    List_init(&(chat_sender->messages));//lg: inizializzo la lista dei messaggi letti
+    List_init(&(chat_sender->messages));// inizializzo la lista dei messaggi 
     chat_sender->sender= sender; //imposto il sender della chat
     chat_sender->receiver=receiver; //imposti il receiver della chat
     chat_sender->num_messages=0; 
@@ -360,13 +360,11 @@ User* User_findByUsername(ListHead* head, const char* username){
 
 ChatListItem* ChatListItem_findByUser(ListHead* head, User* receiver){
     assert(head && "lista vuota");
-    //assert(head->first && "lista vuota");
     assert(receiver && "receiver non presente");
 
-    //User* user=(User*)head->first;
+
     ChatListItem* chat=(ChatListItem*)head->first;
     ChatListItem* aux=chat;
-    if(DEBUG) printf("sto per entrare nel while\n");
     
     while(aux!=NULL){
         chat=aux;
@@ -636,8 +634,12 @@ void chooseOperation(char buf[], int recv_bytes, struct sockaddr_in client_addr,
         authentication(buf, recv_bytes, client_addr, sockaddr_len);
     } else if(op == '2'){
         signin(buf, recv_bytes, client_addr, sockaddr_len);
+    }else if(op == '3'){
+        show_chat(client_addr, sockaddr_len);
     }else if(op == '4'){
         logout(client_addr, sockaddr_len);
+    }else if(op == '5'){
+        show_messages(buf, recv_bytes, client_addr, sockaddr_len);
     }
 }
 
@@ -783,4 +785,124 @@ void logout(struct sockaddr_in client_addr, int sockaddr_len){
     sendRespone("Logout effettuato con successo", client_addr, sockaddr_len);
 
     free(login); // dealoco login
+}
+
+// restituisce le chat totali di un utente in questo formato 
+// numero_chat_utente_richiedente::mittente_0::num_messaggi_di_0::mittente_1::num_messaggi_di_1::####::mittente_n::num_messaggi_di_n
+void show_chat(struct sockaddr_in client_addr, int sockaddr_len){
+    // faccio un check se il client è loggato
+    LoginListItem* login=LoginListItem_findBySockaddr_in(&database.login, client_addr, sockaddr_len);
+    if(login==NULL){
+     
+        sendRespone("User not logged in\n", client_addr, sockaddr_len);
+        return;
+    }
+    
+    User* user=login->user;
+
+    char* buf=(char*)calloc((1+user->num_chats)*1024, sizeof(char));
+
+    
+    int number_of_char=sprintf(buf, "%d::", user->num_chats);
+    if(number_of_char<0)
+        handle_error("sprintf error");
+
+    getChat(buf+3, user->chats);
+    //printf("buf = %s \n", buf);
+    sendRespone(buf, client_addr, sockaddr_len);
+    free(buf);
+    
+}
+
+// funzione ausiliaria di show_chat
+// scrive in buf i receiver con il loro numero di messaggi di una certa chat
+void getChat(char buf[],ListHead chats){
+
+    int i=0;
+    ChatListItem* chat=(ChatListItem*)chats.first;
+    ChatListItem* aux=chat;
+
+    if(aux==NULL){//anche se non ho chat, devo mettere il carattere di terminazione
+        i++;
+        buf[i-1]='\0';
+    }
+    while(aux!=NULL){
+        chat=aux;
+        aux=(ChatListItem*)(chat->list.next);
+        User* user=chat->receiver;
+        int num=chat->num_messages;
+        int temp=sprintf(buf+i, "%s::%d::", user->username, num);
+        if(temp<0)
+            handle_error("sprintf error");
+
+        i+=temp;
+
+    }
+    return;
+}
+
+//restituisce all'utente che ha l'ha richiesto una stringa con tutti i messaggi
+//che ha nella chat con l'utente passato come parametro
+void show_messages(char buf[], int recv_bytes, struct sockaddr_in client_addr, int sockaddr_len){
+
+   /* if(recv_bytes<=0){ 
+        if(DEBUG) printf("non ho ricevuti altri byte\n");
+        sendResponde("Input errato\n", client_addr, sockaddr_len);
+        return;
+    }*/
+    LoginListItem* login=LoginListItem_findBySockaddr_in(&database.login, client_addr, sockaddr_len);
+    if(login==NULL){
+        sendRespone("Utente non loggato", client_addr, sockaddr_len);
+        return;
+    }
+    User* sender=login->user;
+
+    User* receiver=User_findByUsername(&database.users, buf); //trovo il receiver rischiesto dall'user
+    if(receiver==NULL){
+        if(DEBUG) printf("Utente richiesto non esiste\n");
+        sendRespone("Utente richiesto inesistente",client_addr,sockaddr_len);
+        return;
+    }
+    // trovo la chat che ha come receiver l'utente richiesto e come chat, le chat del sender
+    ChatListItem* chat=ChatListItem_findByUser(&sender->chats, receiver);
+    if(chat==NULL){
+        sendRespone("Chat richiesta non esistente\n",client_addr,sockaddr_len);
+        return;
+    }
+
+    printf("s: %s, r: %s \n", sender->username, receiver->username);
+    //creo il messggio
+    char* response =(char*)calloc(1024*(chat->num_messages+1), sizeof(chat));
+    int len=0;
+    
+    
+    getMessages(response, chat->messages);
+
+    //sendRespone(response, client_addr, sockaddr_len);
+
+
+    free(response);
+    return;
+}
+
+//funzione ausiliaria di show_messages 
+//scrive in buf i messaggi di una certa chat nel formato sent::messaggio1\nsent::messaggio2\n....sent::messaggioN\n
+void getMessages(char buf[],ListHead messages){
+    int i=0;
+    
+    MessageListItem* message=(MessageListItem*)messages.first;
+    MessageListItem* aux=message;
+    if(aux==NULL){
+        i++;
+        buf[i-1]='\0';
+    }
+
+    fflush(stdout);
+    while(aux!=NULL){
+        message=aux;
+        aux=(MessageListItem*)(message->list.next);
+        i+=sprintf(buf+i, "%c::%s\n", message->sent, message->message->message);
+    }
+   // printf("buf= %s \n", buf);
+    return;
 }
