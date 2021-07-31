@@ -622,9 +622,36 @@ int file_authentication(char * username, char * password){
     return 0;
 }
 
+//lg: stampa i dati del singolo utente
+void User_print(User* user){
+    assert(user && "argomento User_print è NULL");
+
+    printf("Username: %s\n", user->username);
+    printf("Password: %s\n", user->password);
+    printf("logged: %d\n", user->logged);
+
+    return;
+}
+
+void Database_printUser(){
+    ListHead users=database.users;
+    ListItem* list=users.first;
+
+    while(list){
+        User* user=(User*)list;
+        User_print(user); //lg: stampa dei dati del singolo utente
+        
+        printf("\n\n");
+        list=list->next;
+    }
+    return;
+}
+
+
 // scelgo l'operazione da compiere in base alla richiesta del client
 void chooseOperation(char buf[], int recv_bytes, struct sockaddr_in client_addr, int sockaddr_len){
 
+    
     char op = buf[0];
 
     buf += 2;
@@ -632,12 +659,15 @@ void chooseOperation(char buf[], int recv_bytes, struct sockaddr_in client_addr,
 
     if(op == '1'){
         authentication(buf, recv_bytes, client_addr, sockaddr_len);
+        Database_printUser();
     } else if(op == '2'){
         signin(buf, recv_bytes, client_addr, sockaddr_len);
     }else if(op == '3'){
         show_chat(client_addr, sockaddr_len);
+        
     }else if(op == '4'){
         logout(client_addr, sockaddr_len);
+        Database_printUser();
     }else if(op == '5'){
         show_messages(buf, recv_bytes, client_addr, sockaddr_len);
     }
@@ -780,6 +810,7 @@ void logout(struct sockaddr_in client_addr, int sockaddr_len){
     }
     
     login->user->logged=0;// imposto l'utente come non loggato
+    
     List_detach(&database.login, (ListItem*)login); // tolgo l'oggetto di tipo login dell'utente che ha fatto logout dalla lista del database
 
     sendRespone("Logout effettuato con successo", client_addr, sockaddr_len);
