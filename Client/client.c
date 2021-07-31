@@ -118,7 +118,9 @@ void reciever(char* server_response,size_t server_response_len, int socket_desc)
 }
 /*Funzione che genera comandi ben formati che verranno poi mandati al server per l'esecuzione*/
 void generate_command(char* user, char* password,char* cmd,char op){
-  if (op == 1) sprintf(cmd,"1::%s::%s",user,password);
+  if (op == 1) sprintf(cmd,"%d::%s::%s",op,user,password);
+  else if(op == 2) sprintf(cmd,"%d::%s::%s",op,user,password);
+  else if(op == 4) sprintf(cmd,"%d",op);
 }
 
 /*Sequenza di login, logged viene passato come argomento perche' il client potrebbe essere crashato o
@@ -128,16 +130,12 @@ void login(int socket_desc, struct sockaddr_in server_addr,char* logged,char* us
     char log_cmd[44],server_response[1024];
     int log_len;
     while (1) {
-        char* quit_command = SERVER_COMMAND;
 
         printf("Enter username: ");
-        reader(user,MAX_USER_LEN,"utente");
-        if(strcmp(user,quit_command) == 0) disconnect(socket_desc);
-        
+        reader(user,MAX_USER_LEN,"utente");        
 
         printf("Enter password: ");
         reader_password(password,MAX_PASSWORD_LEN);
-        if(strcmp(password,quit_command) == 0) disconnect(socket_desc);
 
 
         generate_command(user,password,log_cmd,1);
@@ -149,23 +147,65 @@ void login(int socket_desc, struct sockaddr_in server_addr,char* logged,char* us
         char success[62], already_logged[22];
         sprintf(success,"Login effettuato con successo, bentornato %s",user);
         strcpy(already_logged,"Utente già loggato \n");
+        printf("Server responde = %s\n",server_response);
 
         if(!strcmp(success, server_response) || !strcmp(already_logged, server_response)) {
             printTitle();
-            printf("Bentornato nel server, %s\n",server_response);
+            if(!strcmp(already_logged, server_response)) printf("%s\n", already_logged);
+            printf("Bentornato nel server, %s.\n", user);
             *logged = 1;
             return;
         }
         else{
-            printTitle();
+            //printTitle();
             printf("É stata inserito un username e/o password sbagliata, riprovare\n");
         }
     }
 }
 
+void signin(int socket_desc,struct sockaddr_in server_addr){
+    char sign_cmd[44],server_response[1024],user[20],password[20];
+    int sign_len;
+    while(1){
+
+        printf("Enter the username you'll be using: ");
+        reader(user,MAX_USER_LEN,"utente");        
+
+        printf("Enter password you'll be using: ");
+        reader_password(password,MAX_PASSWORD_LEN);
 
 
+        generate_command(user,password,sign_cmd,2);
 
+        sign_len = strlen(sign_cmd);
+        sender(sign_cmd,sign_len,socket_desc,server_addr);
+        reciever(server_response,sizeof(server_response), socket_desc);
+
+        char success[100], already_signed[100];
+        strcpy(success,"Nuovo utente creato correttamente");
+        strcpy(already_signed,"Username già in uso, riprovare con un altro username");
+
+        if(!strcmp(success, server_response)) {
+            printTitle();
+            printf("Bentornato nel server, %s.\n",user);
+            return;
+        }
+        else{
+            printTitle();
+            printf("%s é già presente nel server\n",user);
+            return;
+        }
+    }
+}
+void logout(int socket_desc,struct sockaddr_in server_addr,char* logged){
+    char cmd[10];
+    generate_command(NULL, NULL, cmd, 4);
+    sender(cmd,sizeof(cmd),socket_desc,server_addr);
+    *logged = 0;
+    char server_response[20];
+    reciever(server_response, sizeof(server_response), socket_desc);
+
+}
 int main(int argc, char* argv[]) {
     printTitle();
     
@@ -187,43 +227,41 @@ int main(int argc, char* argv[]) {
     server_addr.sin_port        = htons(SERVER_PORT);          // setto il byte order
     char op[MAX_OPERATION_LEN], logged =  0, user[MAX_USER_LEN], password[MAX_PASSWORD_LEN];
 
-    printf("Benvenuto, sono disponibili le seguenti operazioni:\n");
-    printf("\t1 - Login\n");
-    printf("\t2 - Sign-in\n");
-    printf("\t3 - Chat\n");
-    printf("\t4 - Logout\n");
-    printf("\tQUIT per terminare\n");
-
-    printf("Inserire un operazione: ");
-
-    while(*op < '1' || *op > '2' ){
-        reader(op,MAX_OPERATION_LEN,"operazione");
-        printf("%s\n",op);
-        if(!strcmp(SERVER_COMMAND,op)) disconnect(socket_desc);
-        if(*op == '1') {
-            printTitle();
-            login(socket_desc, server_addr,&logged,user,password);
+    while(1){
+        if(!logged){
+            printf("Benvenuto, sono disponibili le seguenti operazioni:\n");
+            printf("\t1 - Login\n");
+            printf("\t2 - Sign-in\n");
+            printf("\t%s per terminare\n",SERVER_COMMAND);
+            printf("Inserire un operazione: ");
+            reader(op,MAX_OPERATION_LEN,"operazione");
+            if(!strcmp(SERVER_COMMAND,op)) disconnect(socket_desc);
+            else if(!strcmp("1",op)) {
+                printTitle();
+                login(socket_desc, server_addr,&logged,user,password);
+            }
+            else if(!strcmp("2",op)){
+                printTitle();
+                signin(socket_desc,server_addr);
+            }
         }
-        /*else if(op == '2'){
-            printTitle();
-            //signin(socket_desc,server_addr);
-            op = 0;
-            printf("Sorry coming soon\n");
+        else if(logged){
+            printf("Sono disponibili le seguenti operazioni:\n");
+            printf("\t1 - Chat\n");
+            printf("\t2 - Logout\n");
+            printf("\t%s per terminare\n",SERVER_COMMAND);
+            printf("Inserire un operazione: ");
+            reader(op,MAX_OPERATION_LEN,"operazione");
+            if(!strcmp(SERVER_COMMAND,op)) disconnect(socket_desc);
+            else if(!strcmp("1",op)) {
+                printTitle();
+                printf("Operazione non ancora disponibile\n");
+            }
+            else if(!strcmp("2",op)){
+                printTitle();
+                logout(socket_desc,server_addr,&logged);
+            }
+
         }
-        else if(op == '3'){
-            printTitle();
-            op = 0;
-
-            printf("Sorry coming soon\n");
-        }
-        else if(op == '4'){
-            printTitle();
-            op = 0;
-            printf("Sorry coming soon\n");
-        }        */
-
-
-        //else if(op == '4')//logout
-       // else printf("Si prega di selezionare una operazione valida: ");
     }
 }
