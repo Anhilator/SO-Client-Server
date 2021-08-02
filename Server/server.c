@@ -654,28 +654,37 @@ void chooseOperation(char buf[], int recv_bytes, struct sockaddr_in client_addr,
     //converto il char che indica l'operazione in intero
     int op = buf[0] - '0';
 
+    //controllo che la stringa del client sia ben formata
+    if(buf[1]!='*'){
+        sendRespone("Stringa di richiesta mal formata", client_addr, sockaddr_len);
+        return;
+    }
+
     buf += 2;
     recv_bytes -=2;
  
     switch (op)
 	{
 		case 1: 
-		authentication(buf, recv_bytes, client_addr, sockaddr_len);
+		authentication(buf, recv_bytes, client_addr, sockaddr_len); // effettua l'autenticazione dell'utente richiedente
         Database_printUser();
 		break; 
 		case 2: 
-		signin(buf, recv_bytes, client_addr, sockaddr_len);
+		signin(buf, recv_bytes, client_addr, sockaddr_len); //fa registrare un nuovo utente
 		break;
 		case 3: 
-		show_chat(client_addr, sockaddr_len);
+		show_chat(client_addr, sockaddr_len); //mostra le chat dell'utente richiedente
 		break;
 		case 4: 
-		logout(client_addr, sockaddr_len);
+		logout(client_addr, sockaddr_len); // effettua il logout dell'utente richiedente
         Database_printUser();
 		break;
 		case 5: 
-		show_messages(buf, recv_bytes, client_addr, sockaddr_len);
+		show_messages(buf, recv_bytes, client_addr, sockaddr_len); // mostra i messaggi che l'utente richiedente ha scambiato con un certo utente
 		break;
+        case 6:
+        new_chat(buf, recv_bytes, client_addr, sockaddr_len); // crea una nuova chat tra l'utente richiedente e un utente specificato come parametro
+        break;
 		default: 
 		sendRespone("Numero dell'operazione non valido", client_addr, sockaddr_len);
 		break;
