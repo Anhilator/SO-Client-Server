@@ -234,8 +234,8 @@ int Database_readOneMessage(ChatListItem* chat, FILE* file_chat){
 User* initUser(char username[], char password[]){
     assert(username); // controllo che username e password non siano null
     assert(password);
-    int username_len=strlen(username);
-    int password_len=strlen(password);
+    //int username_len=strlen(username);
+    //int password_len=strlen(password);
     // controlliamo se l'utente con quel nome già esiste
     if(User_findByUsername(&database.users, username)!=NULL){ // ritorna NULL se non lo trova
         if(DEBUG) printf("utente %s già esiste\n", username);
@@ -246,7 +246,7 @@ User* initUser(char username[], char password[]){
     assert(username_len<USERNAME_SIZE && "username too long");
     assert(username_len>0 && "username without char");
     assert(password_len>0 && "password without char");*/
-
+ 
     //creo l'utente
     User* user=(User*)calloc(1,sizeof(User));
     user->list.prev=0;
@@ -487,7 +487,7 @@ void addNewLogin(User* user,struct sockaddr_in client_addr, int sockaddr_len){
     List_insert(&(database.login), database.login.last, (ListItem*)login);
 }
 
-// invio una risposta contenuta in bu al client
+// invio una risposta contenuta in buf al client
 void sendRespone(char buf[], struct sockaddr_in client_addr, int sockaddr_len){
     int bytes_left = strlen(buf)+1;
     int bytes_sent=0;
@@ -838,7 +838,7 @@ void show_chat(struct sockaddr_in client_addr, int sockaddr_len){
     if(number_of_char<0)
         handle_error("sprintf error");
 
-    getChat(buf+3, user->chats);
+    get_chat(buf+3, user->chats);
     //printf("buf = %s \n", buf);
     sendRespone(buf, client_addr, sockaddr_len);
     free(buf);
@@ -847,7 +847,7 @@ void show_chat(struct sockaddr_in client_addr, int sockaddr_len){
 
 // funzione ausiliaria di show_chat
 // scrive in buf i receiver con il loro numero di messaggi di una certa chat
-void getChat(char buf[],ListHead chats){
+void get_chat(char buf[],ListHead chats){
 
     int i=0;
     ChatListItem* chat=(ChatListItem*)chats.first;
@@ -904,12 +904,10 @@ void show_messages(char buf[], int recv_bytes, struct sockaddr_in client_addr, i
     printf("s: %s, r: %s \n", sender->username, receiver->username);
     //creo il messggio
     char* response =(char*)calloc(1024*(chat->num_messages+1), sizeof(chat));
-    int len=0;
-    
-    
+
     getMessages(response, chat->messages);
 
-    //sendRespone(response, client_addr, sockaddr_len);
+    sendRespone(response, client_addr, sockaddr_len);
 
 
     free(response);
@@ -919,6 +917,7 @@ void show_messages(char buf[], int recv_bytes, struct sockaddr_in client_addr, i
 //funzione ausiliaria di show_messages 
 //scrive in buf i messaggi di una certa chat nel formato sent::messaggio1\nsent::messaggio2\n....sent::messaggioN\n
 void getMessages(char buf[],ListHead messages){
+
     int i=0;
     
     MessageListItem* message=(MessageListItem*)messages.first;
@@ -936,4 +935,47 @@ void getMessages(char buf[],ListHead messages){
     }
    // printf("buf= %s \n", buf);
     return;
+}
+
+//crea una nuova chat tra il client che ha fatto la richiesta e l'utente specificato
+//dal client nel buffer al momento della richiesta 
+void new_chat(char buf[], int recv_bytes, struct sockaddr_in client_addr, int sockaddr_len){
+
+    //prelevo l'istanza di login del client e faccio un check se l'utente è loggato
+    LoginListItem* login=LoginListItem_findBySockaddr_in(&database.login, client_addr, sockaddr_len);
+    if(login==NULL){ // il client nonè loggato
+       sendRespone("Utente non loggato", client_addr, sockaddr_len);
+        return;
+    }
+ 
+    User* sender=login->user; //mi prendo il sender dall'istanza di login
+
+    User* receiver=User_findByUsername(&database.users, buf); //mi prendo il receiver tramite il messaggio del client
+    
+    if(receiver==NULL){// il receiver non esiste, errore
+        sendRespone("Questo utente non esiste, selezionare un utente esistente per iniziare una chat", client_addr, sockaddr_len);
+        return;
+    }
+    
+    /*
+    if(sender==receiver){
+
+        return;
+    }*/
+    
+    // creo un istanza di chat tra sender e receiver
+    ChatListItem** chat;
+    //inizializzo una chat tra sender e receiver
+    chat = initChat(sender, receiver);
+    if(chat==NULL){ // questa chat già esiste
+        sendRespone("La chat già esiste", client_addr, sockaddr_len);
+        return;
+    }
+    free(chat);
+
+    char msg[1024];
+    sprintf(msg, "Nuova chat creata tra %s e %s \n", sender->username, receiver->username);
+    sendRespone(msg, client_addr, sockaddr_len);
+    return;
+
 }

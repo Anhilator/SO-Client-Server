@@ -12,10 +12,10 @@ void logout(struct sockaddr_in client_addr, int sockaddr_len);
 void signin(char buf[], int recv_butes, struct sockaddr_in client_addr, int sockaddr_len);
 void show_chat(struct sockaddr_in client_addr, int sockaddr_len);
 void show_messages(char buf[], int recv_bytes, struct sockaddr_in client_addr, int sockaddr_len);
-
-
-void getChat(char buf[],ListHead chats);
+void get_chat(char buf[],ListHead chats);
 void getMessages(char buf[],ListHead messages);
+void new_chat(char buf[], int recv_bytes, struct sockaddr_in client_addr, int sockaddr_len);
+
 
 int file_authentication(char * username, char * password);
 
