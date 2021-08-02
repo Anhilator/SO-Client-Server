@@ -651,26 +651,35 @@ void Database_printUser(){
 // scelgo l'operazione da compiere in base alla richiesta del client
 void chooseOperation(char buf[], int recv_bytes, struct sockaddr_in client_addr, int sockaddr_len){
 
-    
-    char op = buf[0];
+    //converto il char che indica l'operazione in intero
+    int op = buf[0] - '0';
 
     buf += 2;
     recv_bytes -=2;
-
-    if(op == '1'){
-        authentication(buf, recv_bytes, client_addr, sockaddr_len);
+ 
+    switch (op)
+	{
+		case 1: 
+		authentication(buf, recv_bytes, client_addr, sockaddr_len);
         Database_printUser();
-    } else if(op == '2'){
-        signin(buf, recv_bytes, client_addr, sockaddr_len);
-    }else if(op == '3'){
-        show_chat(client_addr, sockaddr_len);
-        
-    }else if(op == '4'){
-        logout(client_addr, sockaddr_len);
+		break; 
+		case 2: 
+		signin(buf, recv_bytes, client_addr, sockaddr_len);
+		break;
+		case 3: 
+		show_chat(client_addr, sockaddr_len);
+		break;
+		case 4: 
+		logout(client_addr, sockaddr_len);
         Database_printUser();
-    }else if(op == '5'){
-        show_messages(buf, recv_bytes, client_addr, sockaddr_len);
-    }
+		break;
+		case 5: 
+		show_messages(buf, recv_bytes, client_addr, sockaddr_len);
+		break;
+		default: 
+		sendRespone("Numero dell'operazione non valido", client_addr, sockaddr_len);
+		break;
+	}
 }
 
 
