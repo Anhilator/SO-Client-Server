@@ -654,11 +654,7 @@ void chooseOperation(char buf[], int recv_bytes, struct sockaddr_in client_addr,
     //converto il char che indica l'operazione in intero
     int op = buf[0] - '0';
 
-    //controllo che la stringa del client sia ben formata
-    if(buf[1]!='*'){
-        sendRespone("Stringa di richiesta mal formata", client_addr, sockaddr_len);
-        return;
-    }
+
 
     buf += 2;
     recv_bytes -=2;
@@ -997,3 +993,4 @@ void new_chat(char buf[], int recv_bytes, struct sockaddr_in client_addr, int so
     return;
 
 }
+
