@@ -161,22 +161,22 @@ int readFile_Chats(User* user, FILE* chats){
         // inizializzo una chat tra sender e receiver, la funzione mi tornerà le due chat in entrambi i versi
         ChatListItem** chat= initChat(user, symmetric_user); 
                                                                 
-        ChatListItem* chat_sender;
+        ChatListItem* sender_chat;
         if(chat==NULL){// se chat è null, allora la chat già esisteva (significa che abbiamo letto la chat per l'altro utente)
             // allora la otteniamo con una find, dati gli utenti
-            chat_sender=ChatListItem_findByUsers(user, symmetric_user);
+            sender_chat=ChatListItem_findByUsers(user, symmetric_user);
         }
         else{
-            chat_sender =chat[0]; //mi prendo la chat del sender da chat
+            sender_chat =chat[0]; //mi prendo la chat del sender da chat
             free(chat);
         }
         
-        chat_sender->num_messages=n_message;
+        sender_chat->num_messages=n_message;
 
         if(DEBUG) printf("\nsto per fare readMessage sulla chat %s-%s %d\n", sender, receiver, n_message);
         
-        for(int i=0; i< chat_sender->num_messages; i++){ // itero sui messaggi
-            Database_readOneMessage(chat_sender, chats);
+        for(int i=0; i< sender_chat->num_messages; i++){ // itero sui messaggi
+            Database_readOneMessage(sender_chat, chats);
         }
     }
     return num_chats;    
@@ -299,39 +299,87 @@ ChatListItem** initChat(User* sender, User* receiver){
         return NULL;
     }
 
-    ChatListItem* chat_sender=(ChatListItem*)calloc(1,sizeof(ChatListItem));
-    ChatListItem* chat_receiver=(ChatListItem*)calloc(1,sizeof(ChatListItem));
+    ChatListItem* sender_chat=(ChatListItem*)calloc(1,sizeof(ChatListItem));
+    ChatListItem* receiver_chat=(ChatListItem*)calloc(1,sizeof(ChatListItem));
 
     // inizializzo il sender
-    chat_sender->list.prev=0;
-    chat_sender->list.next=0;
-    List_init(&(chat_sender->messages));// inizializzo la lista dei messaggi 
-    chat_sender->sender= sender; //imposto il sender della chat
-    chat_sender->receiver=receiver; //imposti il receiver della chat
-    chat_sender->num_messages=0; 
+    sender_chat->list.prev=0;
+    sender_chat->list.next=0;
+    List_init(&(sender_chat->messages));// inizializzo la lista dei messaggi 
+    sender_chat->sender= sender; //imposto il sender della chat
+    sender_chat->receiver=receiver; //imposti il receiver della chat
+    sender_chat->num_messages=0; 
     sender->num_chats++; //incremento numero delle chat dell'utente
-    chat_sender->other_chat=chat_receiver;
+    sender_chat->symmetrical_chat= receiver_chat;
     
 
     //inizializzo il receiver
-    chat_receiver->list.prev=0;
-    chat_receiver->list.next=0;
-    List_init(&(chat_receiver->messages));
-    chat_receiver->sender=receiver;
-    chat_receiver->receiver=sender;
-    chat_receiver->num_messages=0;
+    receiver_chat->list.prev=0;
+    receiver_chat->list.next=0;
+    List_init(&(receiver_chat->messages));
+    receiver_chat->sender=receiver;
+    receiver_chat->receiver=sender;
+    receiver_chat->num_messages=0;
     receiver->num_chats++;
-    chat_receiver->other_chat=chat_sender;
+    receiver_chat->symmetrical_chat=sender_chat;
 
     // inserisco le chat nel database
-    List_insert(&(sender->chats),sender->chats.last, (ListItem*)chat_sender);
-    List_insert(&(receiver->chats),receiver->chats.last, (ListItem*)chat_receiver);
+    List_insert(&(sender->chats),sender->chats.last, (ListItem*)sender_chat);
+    List_insert(&(receiver->chats),receiver->chats.last, (ListItem*)receiver_chat);
     
     // chat contenente le due chat simmetriche da ritornare
     ChatListItem** chat=(ChatListItem**)calloc(2,sizeof(ChatListItem*));
-    chat[0]=chat_sender;
-    chat[1]=chat_receiver;
+    chat[0]=sender_chat;
+    chat[1]=receiver_chat;
     return chat; // da deallocare
+}
+
+void initMessageInChat(ChatListItem* sender_chat, const char* string){
+
+    // 
+    ChatListItem* receiver_chat= sender_chat->symmetrical_chat; 
+    int mess_len=strlen(string);
+
+    // controllo sulla lunghezza del messaggio
+    //int mess_len = strlen(string);
+    //assert(mess_len<MESSAGE_SIZE && "string too long"); //lds: verifico che il messaggio non sia troppo lungo
+    //assert(mess_len>0 && "messaggio vuoto");
+
+    // inizializzo i messaggi per entrambi le chat
+    Message* message_sender= (Message*)calloc(1,sizeof(Message)); 
+    if(sprintf(message_sender->message,"%s", string)<0) //metto il messaggio nell'istanza del messaggio
+        handle_error("errore nella sprintf");
+    message_sender->len_message = mess_len;
+
+
+    Message* message_receiver= (Message*)calloc(1,sizeof(Message)); 
+    if(sprintf(message_receiver->message,"%s", string)<0) //metto il messaggio nell'istanza del messaggio
+        handle_error("errore nella sprintf");
+    message_receiver->len_message = mess_len;
+    
+    MessageListItem* message_item_sender = (MessageListItem*)calloc(1,sizeof(MessageListItem)); //lds: alloco la struct per la prima chat
+    MessageListItem* message_item_receiver = (MessageListItem*)calloc(1,sizeof(MessageListItem)); //lds: alloco la struct per la seconda chat
+
+    //inizializzo message_item sender e receiver
+    message_item_receiver->list.prev = 0;
+    message_item_receiver->list.next = 0;
+    
+
+    message_item_receiver->message = message_receiver;// setto il message del message_item
+    message_item_receiver->sent = 'r'; // setto il carattere che indica che il messaggio è stato ricevuto per il receiver
+    receiver_chat->num_messages++;
+    receiver_chat->num_messages_unread++; //lg: per il receiver, un messaggio appena creato è non letto
+
+    message_item_sender->list.prev = 0;
+    message_item_sender->list.next = 0;
+    message_item_sender->message = message_sender;
+    message_item_sender->sent = 's';// setto il carattere che indica che per il sender il messaggio è stato inviato
+    sender_chat->num_messages++; // un messaggio appena creato per il sender è già letto
+    
+
+    List_insert(&(sender_chat->messages), sender_chat->messages.last, (ListItem*)message_item_sender);
+
+    List_insert(&(receiver_chat->messages), receiver_chat->messages.last, (ListItem*)message_item_receiver);
 }
 
 // cerco un utente nella lista di un database e lo restituisco se lo trovo
@@ -876,7 +924,7 @@ void get_chat(char buf[],ListHead chats){
         aux=(ChatListItem*)(chat->list.next);
         User* user=chat->receiver;
         int num=chat->num_messages;
-        int temp=sprintf(buf+i, "%s::%d::", user->username, num);
+        int temp=sprintf(buf+i, "%s**%d::", user->username, num);
         if(temp<0)
             handle_error("sprintf error");
 
@@ -994,3 +1042,47 @@ void new_chat(char buf[], int recv_bytes, struct sockaddr_in client_addr, int so
 
 }
 
+void send_message(char buf[], int recv_bytes, struct sockaddr_in client_addr, int sockaddr_len){
+    
+    // prelevo l'istanza di login legata allo user richiedente
+    LoginListItem* login=LoginListItem_findBySockaddr_in(&database.login, client_addr, sockaddr_len);
+    
+    // mi prendo il sender da login
+    User* sender=login->user;
+
+    
+    char* tok=strtok(buf, "::");
+
+    if(tok==NULL){ //string con formato errato
+
+        sendRespone("String di richiesta errata", client_addr, sockaddr_len);
+        return;
+    }
+
+    // mi prendo il receiver cercandolo con lo username nel database
+    User* receiver=User_findByUsername(&database.users, tok);
+    
+    if(receiver==NULL){ // se il receiver non c'è allora è un errore
+
+        sendRespone("Receiver doesn't exist, try another receiver", client_addr, sockaddr_len);
+        return;
+    }
+
+    //mi prendo il messaggio dalla stringa
+    tok=strtok(NULL, "::\n");
+
+    if(tok==NULL){ // stringa errata
+        sendRespone("Malformed string", client_addr, sockaddr_len);
+        return;
+    }
+
+    //cerco la chat nel database
+    ChatListItem* chat = ChatListItem_findByUsers(sender, receiver);
+    if(chat==NULL){ //chat inesistente
+        sendRespone("The requested chat doesn't exist",client_addr,sockaddr_len);
+        return;
+    }
+    initMessageInChat(chat, tok); // creo il messaggio
+    sendRespone("Message sent succesfully", client_addr, sockaddr_len);
+    return;
+}

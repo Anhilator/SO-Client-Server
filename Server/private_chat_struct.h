@@ -39,7 +39,7 @@ typedef struct ChatListItem {
     ListHead messages_unread;
     User* sender;
     User* receiver;
-    struct ChatListItem* other_chat;
+    struct ChatListItem* symmetrical_chat;
     int num_messages;
     int num_messages_unread;
 } ChatListItem;

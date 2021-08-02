@@ -15,6 +15,7 @@ void show_messages(char buf[], int recv_bytes, struct sockaddr_in client_addr, i
 void get_chat(char buf[],ListHead chats);
 void getMessages(char buf[],ListHead messages);
 void new_chat(char buf[], int recv_bytes, struct sockaddr_in client_addr, int sockaddr_len);
+void send_message(char buf[], int recv_bytes, struct sockaddr_in client_addr, int sockaddr_len);
 
 
 int file_authentication(char * username, char * password);
@@ -35,6 +36,7 @@ ChatListItem* ChatListItem_findByUsers(User* sender, User* receiver);
 
 User* initUser(char username[], char password[]);
 ChatListItem** initChat(User* sender, User* receiver);
+void initMessageInChat(ChatListItem* sender_chat, const char* string);
 
 void setupDatabase();
 
