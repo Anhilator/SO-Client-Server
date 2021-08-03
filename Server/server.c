@@ -1103,7 +1103,14 @@ void show_messages(char buf[], int recv_bytes, struct sockaddr_in client_addr, i
     }
     User* sender=login->user;
 
-    User* receiver=User_findByUsername(&database.users, buf); //trovo il receiver rischiesto dall'user
+    char debug_jose[100];
+    /*Righe aggiunte da Jose che causano un bug e non permettono la corretta scrittura
+    per funzionare nel client va inserito Samuele nella richiesta di chat
+    altrimenti fallisce il controllo sul client e skippa la procedura*/
+    strcpy(debug_jose,"Samuele");
+    printf("%s debug jose \n",debug_jose);
+    User* receiver=User_findByUsername(&database.users, debug_jose); //trovo il receiver rischiesto dall'user
+    
     if(receiver==NULL){
         if(DEBUG) printf("Utente richiesto non esiste\n");
         sendRespone("Utente richiesto inesistente",client_addr,sockaddr_len);
