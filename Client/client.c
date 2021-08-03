@@ -14,6 +14,7 @@
 #define MAX_USER_LEN 20
 #define MAX_PASSWORD_LEN 20
 #define MAX_OPERATION_LEN 6
+#define MAX_MESSAGE_SIZE 1024
 
 
 void create_chat(Chat* chat,char* chat_string){
@@ -21,6 +22,8 @@ void create_chat(Chat* chat,char* chat_string){
     chat->username2 =malloc(sizeof(char*) * MAX_USER_LEN);
     strcpy(chat->username2,tok);
     chat->num_messages_w2 = atoi(strtok(NULL,"**"));
+    chat->messages = (char**) malloc(sizeof(char*) * chat->num_messages_w2);
+
 }
 void print_chat(Chat* chat){
     printf("\t%s, %d messaggi.\n",chat->username2,chat->num_messages_w2);
@@ -271,7 +274,6 @@ void show_chat(int socket_desc,struct sockaddr_in server_addr,User* user){
     for(int i =0;i< user->num_chat;i++){
         tok = strtok(NULL,"::");
         if(tok == NULL) return;
-        
         create_chat(&tmp, tok);
         user->chat[i] = tmp;        
     }
@@ -300,11 +302,28 @@ char msg_cmd[44],username2[20],server_response[1024];
         msg_len = strlen(msg_cmd);
         sender(msg_cmd,msg_len,socket_desc,server_addr);
         reciever(server_response,sizeof(server_response), socket_desc);
-        printf("%s\n",server_response);
-        return;
-
-
-    
+        char* tok = strtok(server_response, "\n");
+        for(int i = 0; i < user->chat[index].num_messages_w2;i++){
+            user->chat[index].messages[i] = (char*) malloc(sizeof(char) * strlen(tok));
+            user->chat[index].messages[i] = tok;
+            tok= strtok(NULL,"\n");
+        }
+        free(tok);
+        for(int i = 0; i < user->chat[index].num_messages_w2;i++){
+            
+            char* tok = strtok(user->chat[index].messages[i],"::");
+            char* sender;
+            if(*tok == 's'){
+                sender = malloc(sizeof(char) * strlen(user->username));
+                strcpy(sender,user->username);
+            }
+            else {
+                sender = malloc(sizeof(char) * strlen(username2));
+                strcpy(sender,username2);
+            }
+            tok = strtok(NULL,"::");
+            printf("%s: %s\n",sender,tok);
+        }
 }
 int main(int argc, char* argv[]) {
     printTitle();

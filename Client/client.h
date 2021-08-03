@@ -1,6 +1,8 @@
+
 typedef struct Chat{
     char* username2;
     int num_messages_w2;
+    char** messages;
 }Chat;
 
 typedef struct User{
