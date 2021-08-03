@@ -20,8 +20,6 @@
 int socket_desc;
 Database database;
 
-
-
 int main(int argc, char* argv[]) {
 
     system("clear"); 
@@ -34,6 +32,78 @@ int main(int argc, char* argv[]) {
     exit(EXIT_SUCCESS); 
 }
 
+// faccio partire il server mettendolo in ascolto sulla porta 
+void startServer(){
+    int ret, recv_bytes;
+
+    //descrittori per socket e client
+
+    // setto i campi della struct sockaddr_in
+    struct sockaddr_in server_addr = {0}; //, client_addr = {0};
+    int sockaddr_len = sizeof(struct sockaddr_in); 
+
+    //inizializzo socket UDP 
+    socket_desc = socket(AF_INET, SOCK_DGRAM, 0);
+    if (socket_desc < 0)
+        handle_error("Could not create socket");
+
+    if (DEBUG) fprintf(stderr, "Socket created...\n");
+
+    // attivo SO_REUSEADDR per far ripartire velocemente il server da un crash
+    int reuseaddr_opt = 1;
+    ret = setsockopt(socket_desc, SOL_SOCKET, SO_REUSEADDR, &reuseaddr_opt, sizeof(reuseaddr_opt));
+    if (ret < 0)
+        handle_error("Cannot set SO_REUSEADDR option");
+
+    
+    server_addr.sin_addr.s_addr = INADDR_ANY;           //setto sin_addr.s_addr con INADDR_ANY per accettare connesioni da qualunque interfaccia
+    server_addr.sin_family      = AF_INET;              //setto sin_familyr con AF_INET per utilizzare il protocollo IPv4
+    server_addr.sin_port        = htons(SERVER_PORT);   // setto il byte order in modo inverso
+
+    // binding dell'indirizzo alla socket (devo castare server_addr in quanto è richiesta una struct di tipo sockaddr*)
+    ret = bind(socket_desc, (struct sockaddr*) &server_addr, sockaddr_len);
+    if (ret < 0)
+        handle_error("Cannot bind address to socket");
+
+    if (DEBUG) fprintf(stderr, "Binded address to socket...\n");
+
+    char buf[1024]; // buffer in cui andrò a scrivere il messaggio
+    size_t buf_len = sizeof(buf);
+    //int msg_len; 
+    memset(buf,0,buf_len); //setto il buffer tutto a 0
+
+    struct sockaddr_in client_addr;
+    sockaddr_len = sizeof(client_addr);
+    // attendo connessioni in modo sequenziale
+    while (1) {
+		
+        if (DEBUG) fprintf(stderr, "opening connection handler...\n");
+         
+
+        recv_bytes = 0;
+        do {
+            // ricevo i byte comunicati dal client e li metto nel buffer 
+            recv_bytes = recvfrom(socket_desc, buf, buf_len-1, 0,(struct sockaddr*) &client_addr, (socklen_t*) &sockaddr_len);
+            if (recv_bytes == -1 && errno == EINTR) continue; 
+            if (recv_bytes == -1) handle_error("Cannot read from the socket");
+            if (recv_bytes == 0) break;
+	    } while ( recv_bytes <= 0 ); // devo evitare la possibilità di messaggi letti parzialmente
+        
+        buf[recv_bytes] = '\0';
+        // formato comando da client numero_operazione::campi per quell'operazione
+
+        chooseOperation(buf, recv_bytes, client_addr, sockaddr_len);
+    
+
+    }
+}
+
+
+
+/* ### FUNZIONI DI INIZIALIZZAZIONE DEL DATABASE ### 
+######################################################*/
+
+//Inizializzo il database 
 void setupDatabase(){
     database.num_users=0; // setto il numero di utenti a zero
     List_init(&database.users); //inizializzo la lista degli utenti
@@ -178,14 +248,13 @@ int readFile_Chats(User* user, FILE* chats){
         if(DEBUG) printf("\nsto per fare readMessage sulla chat %s-%s %d\n", sender, receiver, n_message);
         
         for(int i=0; i< sender_chat->num_messages; i++){ // itero sui messaggi
-            Database_readOneMessage(sender_chat, chats);
+            readOneMessage(sender_chat, chats);
         }
     }
     return num_chats;    
 }
 
-
-int Database_readOneMessage(ChatListItem* chat, FILE* file_chat){
+int readOneMessage(ChatListItem* chat, FILE* file_chat){
     assert(chat && "chat in input è nulla");
     assert(file_chat && "file_chat in input è nullo");
     char buf[1024];
@@ -230,7 +299,82 @@ int Database_readOneMessage(ChatListItem* chat, FILE* file_chat){
 }
 
 
-//  OPERAZIONI SULLE STRUTTURE DATI //
+/* ### FUNZIONI DI RIMOZIONE DEL DATABASE ###
+######################################################*/
+
+// Cancella il database alla chiusura del server
+void desposeDatabase(Database* database){
+    //chiamo la funzione per scrivere i dati presenti nel database sul disco
+    writeDatabaseOnDisk(database);
+
+    //Dealloco le strutture dati allocate nel database
+
+    // istanze di login
+    LoginListItem* login=(LoginListItem*)database->login.first;
+    LoginListItem* aux_login=login;
+    while(aux_login!=NULL){
+        login=aux_login;
+        aux_login=(LoginListItem*)login->list.next;
+        List_detach(&(database->login), (ListItem*)login);//rimuovo il login dalla lista dei login del database
+        free(login);
+    }
+
+    // istanze degli utenti
+    User* user=(User*)database->users.first;
+    User* aux_user=user;
+    while(aux_user!=NULL){
+        user=aux_user;
+        aux_user=(User*)user->list.next;
+        List_detach(&(database->users), (ListItem*)user);//rimuovo lo user dalla lista degli user del database
+        //da implementare Database_deleteUser(user);// dealloco lo user
+    }
+    return;
+}
+
+// Scrivo il contenuto del database sul disco (in questo caso solo le chat di ogni singolo utente)
+void writeDatabaseOnDisk(Database* database){
+
+    FILE* chats =fopen("chat.txt", "w"); //apro il file che contiene i dati sulle chat
+    if(chats ==NULL) 
+        handle_error("errore nell'apertura di chat.txt");
+    
+    User* user=(User*)database->users.first;
+    User* aux=user;
+
+    while(aux!=NULL){
+        user=aux;
+        aux=(User*)user->list.next;
+        ChatListItem* chat=(ChatListItem*)user->chats.first;
+        ChatListItem* aux=chat;
+        if(fprintf(chats, "%d\n", user->num_chats)<0)// scrivo su chat.txt il numero di chat di quell'utente
+            handle_error("errore nella fprintf"); 
+
+        while(aux!=NULL){
+            chat=aux;
+            aux=(ChatListItem*)chat->list.next;
+            // scrivo su chat.txt la riga riguardante gli interlocutori e il loro numero di messaggi
+            if(fprintf(chats, "%s::%s::%d\n", chat->sender->username, chat->receiver->username, chat->num_messages)<0)
+                handle_error("errore nella fprintf"); 
+
+            MessageListItem* message=(MessageListItem*)chat->messages.first;
+            MessageListItem* aux=message;
+            for(int i=0; i<chat->num_messages; i++){
+                message=aux;
+                aux=(MessageListItem*)(message->list.next);
+                if(fprintf(chats, "%c::%s\n", message->sent, message->message->message)<0)
+                    handle_error("errore nella fprintf"); 
+            }
+            
+        } 
+    }
+    if(fclose(chats)==EOF)
+        handle_error("fclose di chat.txt");
+}
+
+
+
+/*###  OPERAZIONI SULLE STRUTTURE DATI ###
+#####################################################*/
 
 //Inizializzo un utente con un certo username e una certa password
 User* initUser(char username[], char password[]){
@@ -336,6 +480,7 @@ ChatListItem** initChat(User* sender, User* receiver){
     return chat; // da deallocare
 }
 
+// Inizializzo un nuovo messaggio in una chat
 void initMessageInChat(ChatListItem* sender_chat, const char* string){
 
     // 
@@ -370,7 +515,6 @@ void initMessageInChat(ChatListItem* sender_chat, const char* string){
     message_item_receiver->message = message_receiver;// setto il message del message_item
     message_item_receiver->sent = 'r'; // setto il carattere che indica che il messaggio è stato ricevuto per il receiver
     receiver_chat->num_messages++;
-    receiver_chat->num_messages_unread++; //lg: per il receiver, un messaggio appena creato è non letto
 
     message_item_sender->list.prev = 0;
     message_item_sender->list.next = 0;
@@ -383,6 +527,30 @@ void initMessageInChat(ChatListItem* sender_chat, const char* string){
 
     List_insert(&(receiver_chat->messages), receiver_chat->messages.last, (ListItem*)message_item_receiver);
 }
+
+// aggiorno la struttura dati del database inserendo un utente che risulta loggato e quindi online
+void addNewLogin(User* user,struct sockaddr_in client_addr, int sockaddr_len){
+    
+    LoginListItem* login=(LoginListItem*)calloc(1,sizeof(LoginListItem));
+    login->list.next=0;
+    login->list.prev=0;
+    login->user=user;
+    login->client_addr=client_addr;
+    login->sockaddr_len=sockaddr_len;
+
+    login->user->logged=1;// setto user loggato
+    //if(DEBUG) printf("login effettuato\n");
+    //(if(DEBUG) User_print(login->user);
+    // inserisco il nuovo utente loggato nella lista di utenti online del database
+    List_insert(&(database.login), database.login.last, (ListItem*)login);
+}
+
+
+
+
+
+/*### FUNZIONI DI RICERCA ###
+####################################################*/
 
 // cerco un utente nella lista di un database e lo restituisco se lo trovo
 User* User_findByUsername(ListHead* head, const char* username){
@@ -407,7 +575,7 @@ User* User_findByUsername(ListHead* head, const char* username){
     return NULL;
 }
 
-
+// cerco la chat di un utente tramite il suo username
 ChatListItem* ChatListItem_findByUser(ListHead* head, User* receiver){
     assert(head && "lista vuota");
     assert(receiver && "receiver non presente");
@@ -426,9 +594,9 @@ ChatListItem* ChatListItem_findByUser(ListHead* head, User* receiver){
     return NULL;
 }
 
+//cerco un chat tra due utenti
 ChatListItem* ChatListItem_findByUsers(User* sender, User* receiver){
-    assert(sender && "sender is NULL");
-    assert(receiver && "receiver is NULL");
+
     return ChatListItem_findByUser(&(sender->chats), receiver);
 
 }
@@ -454,89 +622,6 @@ LoginListItem* LoginListItem_findBySockaddr_in(ListHead* head, struct sockaddr_i
     return NULL;
 }
 
-// faccio partire il server mettendolo in ascolto sulla porta 
-void startServer(){
-    int ret, recv_bytes;
-
-    //descrittori per socket e client
-
-    // setto i campi della struct sockaddr_in
-    struct sockaddr_in server_addr = {0}; //, client_addr = {0};
-    int sockaddr_len = sizeof(struct sockaddr_in); 
-
-    //inizializzo socket UDP 
-    socket_desc = socket(AF_INET, SOCK_DGRAM, 0);
-    if (socket_desc < 0)
-        handle_error("Could not create socket");
-
-    if (DEBUG) fprintf(stderr, "Socket created...\n");
-
-    // attivo SO_REUSEADDR per far ripartire velocemente il server da un crash
-    int reuseaddr_opt = 1;
-    ret = setsockopt(socket_desc, SOL_SOCKET, SO_REUSEADDR, &reuseaddr_opt, sizeof(reuseaddr_opt));
-    if (ret < 0)
-        handle_error("Cannot set SO_REUSEADDR option");
-
-    
-    server_addr.sin_addr.s_addr = INADDR_ANY;           //setto sin_addr.s_addr con INADDR_ANY per accettare connesioni da qualunque interfaccia
-    server_addr.sin_family      = AF_INET;              //setto sin_familyr con AF_INET per utilizzare il protocollo IPv4
-    server_addr.sin_port        = htons(SERVER_PORT);   // setto il byte order in modo inverso
-
-    // binding dell'indirizzo alla socket (devo castare server_addr in quanto è richiesta una struct di tipo sockaddr*)
-    ret = bind(socket_desc, (struct sockaddr*) &server_addr, sockaddr_len);
-    if (ret < 0)
-        handle_error("Cannot bind address to socket");
-
-    if (DEBUG) fprintf(stderr, "Binded address to socket...\n");
-
-    char buf[1024]; // buffer in cui andrò a scrivere il messaggio
-    size_t buf_len = sizeof(buf);
-    //int msg_len; 
-    memset(buf,0,buf_len); //setto il buffer tutto a 0
-
-    struct sockaddr_in client_addr;
-    sockaddr_len = sizeof(client_addr);
-    // attendo connessioni in modo sequenziale
-    while (1) {
-		
-        if (DEBUG) fprintf(stderr, "opening connection handler...\n");
-         
-
-        recv_bytes = 0;
-        do {
-            // ricevo i byte comunicati dal client e li metto nel buffer 
-            recv_bytes = recvfrom(socket_desc, buf, buf_len-1, 0,(struct sockaddr*) &client_addr, (socklen_t*) &sockaddr_len);
-            if (recv_bytes == -1 && errno == EINTR) continue; 
-            if (recv_bytes == -1) handle_error("Cannot read from the socket");
-            if (recv_bytes == 0) break;
-	    } while ( recv_bytes <= 0 ); // devo evitare la possibilità di messaggi letti parzialmente
-        
-        buf[recv_bytes] = '\0';
-        // formato comando da client numero_operazione::campi per quell'operazione
-
-        chooseOperation(buf, recv_bytes, client_addr, sockaddr_len);
-    
-
-    }
-}
-
-// aggiorno la struttura dati del database inserendo un utente che risulta loggato e quindi online
-void addNewLogin(User* user,struct sockaddr_in client_addr, int sockaddr_len){
-    
-    LoginListItem* login=(LoginListItem*)calloc(1,sizeof(LoginListItem));
-    login->list.next=0;
-    login->list.prev=0;
-    login->user=user;
-    login->client_addr=client_addr;
-    login->sockaddr_len=sockaddr_len;
-
-    login->user->logged=1;// setto user loggato
-    //if(DEBUG) printf("login effettuato\n");
-    //(if(DEBUG) User_print(login->user);
-    // inserisco il nuovo utente loggato nella lista di utenti online del database
-    List_insert(&(database.login), database.login.last, (ListItem*)login);
-}
-
 // invio una risposta contenuta in buf al client
 void sendRespone(char buf[], struct sockaddr_in client_addr, int sockaddr_len){
     int bytes_left = strlen(buf)+1;
@@ -551,10 +636,8 @@ void sendRespone(char buf[], struct sockaddr_in client_addr, int sockaddr_len){
 
 }
 
-
 void* connection_handler(int socket_desc) {
     int ret, recv_bytes, bytes_sent;
-
 
     char buf[1024]; // buffer in cui andrò a scrivere il messaggio
     size_t buf_len = sizeof(buf);
@@ -564,7 +647,6 @@ void* connection_handler(int socket_desc) {
     struct sockaddr_in client_addr;
     int sockaddr_len = sizeof(client_addr); 
     
-
     // echo loop
     while (1) {
         
@@ -591,37 +673,12 @@ void* connection_handler(int socket_desc) {
         }
     }
 
-
     // chiudo la socket
     ret = close(socket_desc);
     if (ret < 0) handle_error("Cannot close socket for incoming connection");
 
-    if (DEBUG) fprintf(stderr, "Socket closed...\n");
 
     return NULL;
-}
-
-// stampa il titolo 
-void printTitle(){
-    
-    char *filename = "title_server.txt";
-    FILE *fp = fopen(filename, "r");
-
-    if (fp == NULL)
-    {
-        handle_error("Errore apertura file\n");
-    }
-
-    // reading line by line, max 256 bytes
-    const unsigned MAX_LENGTH = 256;
-    char buffer[MAX_LENGTH];
-
-    while (fgets(buffer, MAX_LENGTH, fp))
-        printf("%s", buffer);
-
-    // close the file
-    fclose(fp);
-
 }
 
 int file_authentication(char * username, char * password){
@@ -672,7 +729,7 @@ int file_authentication(char * username, char * password){
     return 0;
 }
 
-//lg: stampa i dati del singolo utente
+// stampa i dati del singolo utente
 void User_print(User* user){
     assert(user && "argomento User_print è NULL");
 
@@ -682,14 +739,13 @@ void User_print(User* user){
 
     return;
 }
-
 void Database_printUser(){
     ListHead users=database.users;
     ListItem* list=users.first;
 
     while(list){
         User* user=(User*)list;
-        User_print(user); //lg: stampa dei dati del singolo utente
+        User_print(user); // stampa dei dati del singolo utente
         
         printf("\n\n");
         list=list->next;
@@ -697,6 +753,28 @@ void Database_printUser(){
     return;
 }
 
+// stampa il titolo 
+void printTitle(){
+    
+    char *filename = "title_server.txt";
+    FILE *fp = fopen(filename, "r");
+
+    if (fp == NULL)
+    {
+        handle_error("Errore apertura file\n");
+    }
+
+    // reading line by line, max 256 bytes
+    const unsigned MAX_LENGTH = 256;
+    char buffer[MAX_LENGTH];
+
+    while (fgets(buffer, MAX_LENGTH, fp))
+        printf("%s", buffer);
+
+    // close the file
+    fclose(fp);
+
+}
 
 // scelgo l'operazione da compiere in base alla richiesta del client
 void chooseOperation(char buf[], int recv_bytes, struct sockaddr_in client_addr, int sockaddr_len){
@@ -738,7 +816,11 @@ void chooseOperation(char buf[], int recv_bytes, struct sockaddr_in client_addr,
 }
 
 
-// OPERAZIONI SELEZIONABILI DAL CLIENT  //
+
+
+
+/* OPERAZIONI SELEZIONABILI DAL CLIENT  //
+#######################################################*/
 
 // utilizzando i dati forniti dal cliente, prova ad effettuare un'autenticazione nel database
 void authentication(char buf[], int recv_bytes, struct sockaddr_in client_addr, int sockaddr_len){
@@ -896,8 +978,7 @@ void logout(struct sockaddr_in client_addr, int sockaddr_len){
 void show_chat(struct sockaddr_in client_addr, int sockaddr_len){
     // faccio un check se il client è loggato
     LoginListItem* login=LoginListItem_findBySockaddr_in(&database.login, client_addr, sockaddr_len);
-    if(login==NULL){
-     
+    if(login==NULL){ 
         sendRespone("User not logged in\n", client_addr, sockaddr_len);
         return;
     }
@@ -1053,6 +1134,7 @@ void new_chat(char buf[], int recv_bytes, struct sockaddr_in client_addr, int so
 
 }
 
+// da la possibilità di inviare un certo messaggio ad un certo utente
 void send_message(char buf[], int recv_bytes, struct sockaddr_in client_addr, int sockaddr_len){
     
     // prelevo l'istanza di login legata allo user richiedente

@@ -40,6 +40,11 @@ void initMessageInChat(ChatListItem* sender_chat, const char* string);
 
 void setupDatabase();
 
-void addNewLogin(User* user,struct sockaddr_in client_addr, int sockaddr_len);
-int Database_readOneMessage(ChatListItem* chat, FILE* file_chat);
+void desposeDatabase(Database* database);
 
+
+
+void addNewLogin(User* user,struct sockaddr_in client_addr, int sockaddr_len);
+int readOneMessage(ChatListItem* chat, FILE* file_chat);
+
+void writeDatabaseOnDisk(Database* database);

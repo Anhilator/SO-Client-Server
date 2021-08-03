@@ -36,12 +36,10 @@ typedef struct User {
 typedef struct ChatListItem {
     ListItem list;
     ListHead messages;
-    ListHead messages_unread;
     User* sender;
     User* receiver;
     struct ChatListItem* symmetrical_chat;
     int num_messages;
-    int num_messages_unread;
 } ChatListItem;
 
 // struct per rappresentare il login di un utente, utile da avere nel databse per sapere quali sono gli utenti loggati
