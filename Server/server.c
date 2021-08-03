@@ -808,6 +808,7 @@ void authentication(char buf[], int recv_bytes, struct sockaddr_in client_addr, 
 //effettua la registrazione di un nuovo utente
 void signin(char buf[], int recv_butes, struct sockaddr_in client_addr, int sockaddr_len){
     FILE * fl;
+    FILE * chats;
     char* tok=strtok(buf,"::");// prendo lo username
     if(DEBUG && tok==NULL) printf("problemi con tok\n");
     
@@ -850,12 +851,19 @@ void signin(char buf[], int recv_butes, struct sockaddr_in client_addr, int sock
     
     //procedo a scrivere le credenziali del nuovo utente su disco    
     fl = fopen ( "user.txt" , "a" );
+    chats = fopen ("chat.txt", "a");
     if (fl==NULL) {
         handle_error("Errore apertura del file \n");
     }
 
+    if (chats==NULL) {
+        handle_error("Errore apertura del file \n");
+    }
+
     fprintf(fl, "%s::%s\n", username, password);
+    fprintf(fl, "\n0");
     fclose(fl);
+    fclose(chats);
     return;
 
 }
