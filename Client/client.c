@@ -8,6 +8,7 @@
 #include <sys/socket.h>
 #include <termios.h>
 #include "common.h"
+#include "../CSP.h"
 
 #define MAX_USER_LEN 20
 #define MAX_PASSWORD_LEN 20
@@ -34,8 +35,21 @@ void printTitle(){
     fclose(fp);
 
 }
+void connection(int* socket_desc, struct sockaddr_in* server_addr){
+        // inizializzo la socket di tipo SOCK_DGRAM, ovvero UDP
+    *socket_desc = socket(AF_INET, SOCK_DGRAM, 0);
+    if (socket_desc < 0)
+        handle_error("Could not create socket");
+
+    if (DEBUG) fprintf(stderr, "Socket created...\n");
+
+    
+    server_addr->sin_addr.s_addr = inet_addr(SERVER_ADDRESS);   // setto l'indirizzo
+    server_addr->sin_family      = AF_INET;                     // scelgo il protocollo Ipv4 
+    server_addr->sin_port        = htons(SERVER_PORT);          // setto il byte order
+}
 //Funzione che rilascia le risorse nel caso di chiusura
-void disconnect(int socket_desc){
+void disconnection(int socket_desc){
     // chiudo le varie socket
     int ret = close(socket_desc);
     if (ret < 0) handle_error("Cannot close the socket");
@@ -144,14 +158,20 @@ void login(int socket_desc, struct sockaddr_in server_addr,char* logged,char* us
         sender(log_cmd,log_len,socket_desc,server_addr);
         reciever(server_response,sizeof(server_response), socket_desc);
 
-        char success[62], already_logged[22];
-        sprintf(success,"Login effettuato con successo, bentornato %s",user);
-        strcpy(already_logged,"Utente già loggato \n");
-        printf("Server responde = %s\n",server_response);
+        if(DEBUG) printf("Server responde = %s\n",server_response);
+        char success[100];
+        sprintf(success,LOGIN_SUCCESS,user); // necessario per una corretta formattazione
+        if (DEBUG) {
+            printf("%s\n",success);
+            printf("comparazione successo e risposta %d\n\n",strcmp(LOGIN_SUCCESS, server_response));
+            printf("comparazione gia acceduto e risposta %d\n\n",strcmp(ALREADY_LOGGED, server_response));
+            printf("%s\n\n",ALREADY_LOGGED);
+            printf("%s\n\n",LOGIN_SUCCESS);
+            }
 
-        if(!strcmp(success, server_response) || !strcmp(already_logged, server_response)) {
+        if(!strcmp(LOGIN_SUCCESS, server_response) || !strcmp(ALREADY_LOGGED, server_response)) {
             printTitle();
-            if(!strcmp(already_logged, server_response)) printf("%s\n", already_logged);
+            if(!strcmp(ALREADY_LOGGED, server_response)) printf("%s\n", ALREADY_LOGGED);
             printf("Bentornato nel server, %s.\n", user);
             *logged = 1;
             return;
@@ -181,13 +201,9 @@ void signin(int socket_desc,struct sockaddr_in server_addr){
         sender(sign_cmd,sign_len,socket_desc,server_addr);
         reciever(server_response,sizeof(server_response), socket_desc);
 
-        char success[100], already_signed[100];
-        strcpy(success,"Nuovo utente creato correttamente");
-        strcpy(already_signed,"Username già in uso, riprovare con un altro username");
-
-        if(!strcmp(success, server_response)) {
+        if(!strcmp(SIGNIN_SUCCESS, server_response)) {
             printTitle();
-            printf("Bentornato nel server, %s.\n",user);
+            printf("Benvenuto/a nel server, %s.\n",user);
             return;
         }
         else{
@@ -202,8 +218,9 @@ void logout(int socket_desc,struct sockaddr_in server_addr,char* logged){
     generate_command(NULL, NULL, cmd, 4);
     sender(cmd,sizeof(cmd),socket_desc,server_addr);
     *logged = 0;
-    char server_response[20];
+    char server_response[100];
     reciever(server_response, sizeof(server_response), socket_desc);
+    printf("%s\n", server_response);
 
 }
 int main(int argc, char* argv[]) {
@@ -214,17 +231,8 @@ int main(int argc, char* argv[]) {
     int socket_desc;
     struct sockaddr_in server_addr = {0}; 
 
-    // inizializzo la socket di tipo SOCK_DGRAM, ovvero UDP
-    socket_desc = socket(AF_INET, SOCK_DGRAM, 0);
-    if (socket_desc < 0)
-        handle_error("Could not create socket");
+    connection(&socket_desc,&server_addr);
 
-    if (DEBUG) fprintf(stderr, "Socket created...\n");
-
-    
-    server_addr.sin_addr.s_addr = inet_addr(SERVER_ADDRESS);   // setto l'indirizzo
-    server_addr.sin_family      = AF_INET;                     // scelgo il protocollo Ipv4 
-    server_addr.sin_port        = htons(SERVER_PORT);          // setto il byte order
     char op[MAX_OPERATION_LEN], logged =  0, user[MAX_USER_LEN], password[MAX_PASSWORD_LEN];
 
     while(1){
@@ -235,7 +243,7 @@ int main(int argc, char* argv[]) {
             printf("\t%s per terminare\n",SERVER_COMMAND);
             printf("Inserire un operazione: ");
             reader(op,MAX_OPERATION_LEN,"operazione");
-            if(!strcmp(SERVER_COMMAND,op)) disconnect(socket_desc);
+            if(!strcmp(SERVER_COMMAND,op)) disconnection(socket_desc);
             else if(!strcmp("1",op)) {
                 printTitle();
                 login(socket_desc, server_addr,&logged,user,password);
@@ -252,7 +260,7 @@ int main(int argc, char* argv[]) {
             printf("\t%s per terminare\n",SERVER_COMMAND);
             printf("Inserire un operazione: ");
             reader(op,MAX_OPERATION_LEN,"operazione");
-            if(!strcmp(SERVER_COMMAND,op)) disconnect(socket_desc);
+            if(!strcmp(SERVER_COMMAND,op)) disconnection(socket_desc);
             else if(!strcmp("1",op)) {
                 printTitle();
                 printf("Operazione non ancora disponibile\n");

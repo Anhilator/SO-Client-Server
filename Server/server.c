@@ -13,6 +13,8 @@
 #include "server.h"
 #include "common.h"
 #include "private_chat_struct.h"
+#include "../CSP.h"
+
 
 
 int socket_desc;
@@ -785,7 +787,7 @@ void authentication(char buf[], int recv_bytes, struct sockaddr_in client_addr, 
         if(user->logged){
             
             if(DEBUG) printf("utente già loggato\n");
-            sendRespone("Utente già loggato \n", client_addr, sockaddr_len);
+            sendRespone(ALREADY_LOGGED, client_addr, sockaddr_len);
             return;
         }
         else{ // se non ero loggato aggiorno il database e notifico il client
@@ -793,10 +795,11 @@ void authentication(char buf[], int recv_bytes, struct sockaddr_in client_addr, 
             if (DEBUG) printf("faccio operazioni di log\n");
             addNewLogin(user, client_addr, sockaddr_len);// aggiungo l'utente alla lista di utenti online
             
-            sprintf(buf, "Login effettuato con successo, bentornato %s", username);
-            sendRespone(buf, client_addr, sockaddr_len);// mando il messaggio di conferma del login
+            //sprintf(buf, "Login effettuato con successo, bentornato %s", username);
+            sendRespone(LOGIN_SUCCESS, client_addr, sockaddr_len);// mando il messaggio di conferma del login
             return;
         }
+    
     }
     else{ //username e password sbagliati
         
@@ -842,12 +845,12 @@ void signin(char buf[], int recv_butes, struct sockaddr_in client_addr, int sock
 
     // se initUser mi ha tornato NULL allora l'utente già esiste
     if(user == NULL){
-        sendRespone("Username già in uso, riprovare con un altro username", client_addr, sockaddr_len);
+        sendRespone(ALREADY_SIGNED, client_addr, sockaddr_len);
         return;
     }
 
     //altrimenti avremo che la registrazione è andata a buon fine
-    sendRespone("Nuovo utente creato correttamente", client_addr, sockaddr_len);
+    sendRespone(SIGNIN_SUCCESS, client_addr, sockaddr_len);
     
     //procedo a scrivere le credenziali del nuovo utente su disco    
     fl = fopen ( "user.txt" , "a" );
@@ -875,7 +878,7 @@ void logout(struct sockaddr_in client_addr, int sockaddr_len){
 
     if(login==NULL){// se non l'ho trovato vuol dire che non era ancora loggato
 
-        sendRespone("Utente non ancora loggato, impossibile effetuare logout", client_addr, sockaddr_len);
+        sendRespone(LOGOUT_FAILURE, client_addr, sockaddr_len);
         return;
     }
     
@@ -883,9 +886,9 @@ void logout(struct sockaddr_in client_addr, int sockaddr_len){
     
     List_detach(&database.login, (ListItem*)login); // tolgo l'oggetto di tipo login dell'utente che ha fatto logout dalla lista del database
 
-    sendRespone("Logout effettuato con successo", client_addr, sockaddr_len);
+    sendRespone(LOGOUT_SUCCESS, client_addr, sockaddr_len);
 
-    free(login); // dealoco login
+    free(login); // dealloco login
 }
 
 // restituisce le chat totali di un utente in questo formato 
