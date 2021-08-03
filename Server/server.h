@@ -50,3 +50,5 @@ void addNewLogin(User* user,struct sockaddr_in client_addr, int sockaddr_len);
 int readOneMessage(ChatListItem* chat, FILE* file_chat);
 
 void writeDatabaseOnDisk(Database* database);
+
+void serverTerminationHandler(int signum);

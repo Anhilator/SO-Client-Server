@@ -8,6 +8,7 @@
 #include <arpa/inet.h>  // htons()
 #include <netinet/in.h> // struct sockaddr_in
 #include <sys/socket.h>
+#include <signal.h>
 
 #include "linked_list.h"
 #include "server.h"
@@ -19,6 +20,7 @@
 
 int socket_desc;
 Database database;
+volatile int close_server=0;
 
 int main(int argc, char* argv[]) {
 
@@ -27,9 +29,27 @@ int main(int argc, char* argv[]) {
 
     setupDatabase();
 
+    struct sigaction old_action={0};
+    struct sigaction new_action={0};
+    new_action.sa_handler= serverTerminationHandler;
+    sigemptyset (&new_action.sa_mask);
+    new_action.sa_flags = 0;
+    sigaction(SIGINT, &new_action, &old_action);
+
     startServer();
 
+    sigaction(SIGINT, &old_action, &new_action); 
+
+    printf("\n Inizio procedura di chiusura \n");
+    desposeDatabase(&database);
+
     exit(EXIT_SUCCESS); 
+}
+
+void serverTerminationHandler(int signum){
+
+    close_server=1; // la setto in modo da terminare il ciclo infinito di lettura da socket e iniziare la procedura di chiusura del server
+    
 }
 
 // faccio partire il server mettendolo in ascolto sulla porta 
@@ -77,11 +97,16 @@ void startServer(){
     // attendo connessioni in modo sequenziale
     while (1) {
 		
-        if (DEBUG) fprintf(stderr, "opening connection handler...\n");
+        
          
 
         recv_bytes = 0;
         do {
+            if (close_server==1){
+                if(close(socket_desc)) handle_error("Errore nella close");
+                return;
+            }
+
             // ricevo i byte comunicati dal client e li metto nel buffer 
             recv_bytes = recvfrom(socket_desc, buf, buf_len-1, 0,(struct sockaddr*) &client_addr, (socklen_t*) &sockaddr_len);
             if (recv_bytes == -1 && errno == EINTR) continue; 
@@ -96,6 +121,7 @@ void startServer(){
     
 
     }
+    
 }
 
 
