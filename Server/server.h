@@ -41,7 +41,9 @@ void initMessageInChat(ChatListItem* sender_chat, const char* string);
 void setupDatabase();
 
 void desposeDatabase(Database* database);
-
+void deleteUser(User* user);
+void deleteChatListItem(ChatListItem* chat);
+void deleteMessageListItem(MessageListItem* messagge);
 
 
 void addNewLogin(User* user,struct sockaddr_in client_addr, int sockaddr_len);

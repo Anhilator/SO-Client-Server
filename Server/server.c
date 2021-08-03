@@ -326,10 +326,45 @@ void desposeDatabase(Database* database){
         user=aux_user;
         aux_user=(User*)user->list.next;
         List_detach(&(database->users), (ListItem*)user);//rimuovo lo user dalla lista degli user del database
-        //da implementare Database_deleteUser(user);// dealloco lo user
+        deleteUser(user);// dealloco lo user
     }
     return;
 }
+
+// Dealloca un'istanza di user
+void deleteUser(User* user){
+
+    ChatListItem* chat=(ChatListItem*)user->chats.first;
+    ChatListItem* aux=chat;
+    while(aux!=NULL){
+        chat=aux;
+        aux=(ChatListItem*)chat->list.next;
+        List_detach(&(user->chats), (ListItem*)chat);
+        deleteChatListItem(chat);
+    }
+    free(user);
+}
+
+// Dealloca un istanza di una chat
+void deleteChatListItem(ChatListItem* chat){
+
+    MessageListItem* message=(MessageListItem*)chat->messages.first;
+    MessageListItem* aux=message;
+    while(aux!=NULL){
+        message=aux;
+        aux=(MessageListItem*)message->list.next;
+        List_detach(&(chat->messages), (ListItem*) message);
+        deleteMessageListItem(message);
+    }
+
+}
+
+// Dealloca un istanza di un messaggio
+void deleteMessageListItem(MessageListItem* messagge){
+    free(messagge->message);
+    free(messagge);
+}
+
 
 // Scrivo il contenuto del database sul disco (in questo caso solo le chat di ogni singolo utente)
 void writeDatabaseOnDisk(Database* database){
