@@ -843,11 +843,13 @@ void chooseOperation(char buf[], int recv_bytes, struct sockaddr_in client_addr,
     //converto il char che indica l'operazione in intero
     int op = buf[0] - '0';
 
+    printf("buf before = %s \n", buf);
 
+    buf += 3;
+    recv_bytes -=3;
+    
+    printf("buf after = %s \n", buf);
 
-    buf += 2;
-    recv_bytes -=2;
- 
     switch (op)
 	{
 		case 1: 
@@ -1103,13 +1105,8 @@ void show_messages(char buf[], int recv_bytes, struct sockaddr_in client_addr, i
     }
     User* sender=login->user;
 
-    char debug_jose[100];
-    /*Righe aggiunte da Jose che causano un bug e non permettono la corretta scrittura
-    per funzionare nel client va inserito Samuele nella richiesta di chat
-    altrimenti fallisce il controllo sul client e skippa la procedura*/
-    strcpy(debug_jose,"Samuele");
-    printf("%s debug jose \n",debug_jose);
-    User* receiver=User_findByUsername(&database.users, debug_jose); //trovo il receiver rischiesto dall'user
+
+    User* receiver=User_findByUsername(&database.users, buf); //trovo il receiver rischiesto dall'user
     
     if(receiver==NULL){
         if(DEBUG) printf("Utente richiesto non esiste\n");
