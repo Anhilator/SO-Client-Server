@@ -272,7 +272,7 @@ int main(int argc, char* argv[]) {
 
     char op[MAX_OPERATION_LEN],in_chat = 0;
     char* other_user;
-    User user; 
+    User user = {0}; 
 
     while(1){
         if(user.username != NULL && user.logged && !in_chat){
