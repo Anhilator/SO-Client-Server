@@ -11,33 +11,123 @@
 #include "../CSP.h"
 #include "client.h"
 #include "functions.c"
+#include "linked_list.h"
 
-void init_chat_from_str(Chat* chat,char* chat_string,int index){
-    char* tok  = strtok(chat_string,"**");
 
-    chat[index].username2 = malloc(sizeof(char*) * strlen(tok) + 1);
-    strcpy(chat[index].username2,tok);
-    chat[index].num_messages_w2 = atoi(strtok(NULL,"**"));
-    chat[index].messages = (char**) malloc(sizeof(char*) * chat->num_messages_w2);
-
-}
 
 void init_user(User* user, char* username, int logged,int socket_desc,struct sockaddr_in server_addr){
     user->username = (char*)malloc(sizeof(char*) * strlen(username)+1);
     strcpy(user->username, username);
+    user->chats = (ListHead*)malloc(sizeof(ListHead));
     user->logged = logged;
-    get_chat(socket_desc,server_addr,user);
+    get_all_chats(socket_desc,server_addr,user);
+    user->num_chat = 0;
+    
 }
 
 void destroy_user(User* user){
-    free(user->chat);
+    free(user->chats);
     free(user->username);
-    
     user->num_chat = 0;
     user->logged = 0;
 }
 
+/*funzione che inserisce le chat nell'utente*/
+void get_all_chats(int socket_desc,struct sockaddr_in server_addr,User* user){    
+    char cmd[10],server_response[100];
+    generate_command(NULL, NULL, cmd,3);
+    sender(cmd,sizeof(cmd),socket_desc,server_addr);
+    reciever(server_response,sizeof(server_response),socket_desc);
+    List_init(user->chats);
+    char* tok = strtok(server_response,"::");
+    user->num_chat = atoi(tok);
+    if(user->num_chat == 0) return;
+    
+    char** tmp = malloc(sizeof(char*) * user->num_chat);
+    for(int i =0;i < user->num_chat;i++){
+        tok = strtok(NULL,"::");
+        tmp[i]= malloc(sizeof(char)* strlen(tok));
+        strcpy(tmp[i],tok);
+    }
+    
+    for(int i =0;i < user->num_chat;i++){
+        ChatListItem* c_item = (ChatListItem*) malloc(sizeof(ChatListItem));
+        ((ListItem*)c_item)->prev =((ListItem*)c_item) ->next  =0;
+        char* tok2 = strtok(tmp[i],"**");
+        c_item->other_user = malloc(sizeof(char) * (strlen(tok2)+1));
+        strcpy(c_item->other_user, tok2);
+        tok2 = strtok(NULL,"**");
+        c_item->num_messages = atoi(tok2);        
+        List_insert(user->chats,(ListItem*)user->chats->last,(ListItem*)c_item);
+    }
 
+}
+/*funzione ausiliaria che dati due utenti controlla se user ha una chat con user2*/
+ChatListItem* find_chat_by_other_user(User* user, char* user2){
+    ListItem* aux=user->chats->first;
+    for(int i =0;i < user->num_chat;i++){
+        ChatListItem* tmp = (ChatListItem*) aux;
+        if(!strcmp(tmp->other_user,user2)) return tmp;
+        aux = aux->next;
+    }
+    return NULL;
+}
+/*funzione che dato un char* rappresentante un altro utente ritorna la chat relativa all'altro utente.*/
+ChatListItem* get_messages(int socket_desc, struct sockaddr_in server_addr,User* user){
+    if(user->num_chat <= 0) return NULL;
+    
+    char msg_cmd[44],username2[20],server_response[1024];   
+    int msg_len;
+    ChatListItem* c_item=(ChatListItem*) malloc(sizeof(ChatListItem));
+    
+
+    if(!DEBUG){
+        printf("Enter username of the user view the chats with: ");
+        reader(username2,MAX_USER_LEN,"utente");
+        }        
+    if(DEBUG) strcpy(username2,"Jose");
+    generate_command(username2,NULL,msg_cmd,5);
+    c_item = find_chat_by_other_user(user, username2);
+    if(c_item == NULL){
+        printf("Non si hanno chat con questo utente\n");
+        return NULL;
+    }
+    
+    
+    msg_len = strlen(msg_cmd);
+    sender(msg_cmd,msg_len,socket_desc,server_addr);
+    reciever(server_response,sizeof(server_response), socket_desc);
+
+    char* tok = strtok(server_response, "\n");
+    char** tmp = malloc(sizeof(char*) * c_item->num_messages);        
+    for(int i = 0; i < c_item->num_messages;i++){
+
+        tmp[i]= malloc(sizeof(char)* strlen(tok));
+        strcpy(tmp[i],tok);
+        tok = strtok(NULL,"\n");
+    }
+    c_item->messages = malloc(sizeof(ListHead));
+    List_init(c_item->messages);
+    for(int i = 0; i < c_item->num_messages;i++){
+        tok = strtok(tmp[i],"::");
+        MessageListItem* m_item = (MessageListItem*)malloc(sizeof(MessageListItem));
+        ((ListItem*)m_item)->prev =((ListItem*)m_item) ->next  =0;
+
+        if(*tok == 's'){
+            tok = strtok(NULL,"::");
+            m_item->message = malloc(sizeof(char*)*(strlen(user->username) + strlen(": ") + strlen(tok)));
+            sprintf(m_item->message, "%s: %s",user->username,tok);
+        }
+        else {
+            tok = strtok(NULL,"::");
+            m_item->message = malloc(sizeof(char*)*(strlen(username2) + strlen(": ") + strlen(tok)));
+            sprintf(m_item->message, "%s: %s",username2,tok);
+            }
+            List_insert(c_item->messages,c_item->messages->last, (ListItem*) m_item);
+        }
+    
+    return c_item;
+}
 
 /*Sequenza di login, logged viene passato come argomento perche' il client potrebbe essere crashato o
 interrotto durante una precedente esecuzione, tale variabile permette di "interrogare" il database 
@@ -49,9 +139,8 @@ void login(int socket_desc, struct sockaddr_in server_addr,User* user){
         if(DEBUG) {
             sender("1::Samuele::password1",44,socket_desc,server_addr);
             reciever(server_response,sizeof(server_response), socket_desc);
-
             init_user(user, "Samuele",1,socket_desc,server_addr);
-            get_chat(socket_desc,server_addr,user);
+            get_all_chats(socket_desc,server_addr,user);
             return;
         }
         printf("Enter username: ");
@@ -74,8 +163,7 @@ void login(int socket_desc, struct sockaddr_in server_addr,User* user){
             if(!strcmp(ALREADY_LOGGED, server_response)) printf("%s\n", ALREADY_LOGGED);
             printf("Bentornato nel server, %s.\n", username);
             init_user(user, username,1,socket_desc,server_addr);
-            print_user(user,0);
-
+            get_all_chats(socket_desc,server_addr,user);
             return;
         }
         else{
@@ -123,90 +211,32 @@ void logout(int socket_desc,struct sockaddr_in server_addr,User* user){
     if(!strcmp(server_response,LOGOUT_SUCCESS)) destroy_user(user);
 
 }
-void get_chat(int socket_desc,struct sockaddr_in server_addr,User* user){    
-    char cmd[10],server_response[100];
-    generate_command(NULL, NULL, cmd,3);
-    sender(cmd,sizeof(cmd),socket_desc,server_addr);
-    reciever(server_response,sizeof(server_response),socket_desc);
-    char* tok = strtok(server_response,"::");
-    user->num_chat = atoi(tok);
-    user->chat = (Chat*) malloc(sizeof(Chat) * user->num_chat);
-    char** tmp = (char**) malloc(sizeof(char*) * user->num_chat);
-    for(int i =0;i< user->num_chat;i++){
-        tok = strtok(NULL,"::");
-        if(tok!=NULL) {
-            tmp[i] =(char*) malloc(sizeof(char)* strlen(tok));
-            strcpy(tmp[i],tok);
-        }
-
-    }
-    for(int i =0;i< user->num_chat;i++){
-        init_chat_from_str(user->chat,tmp[i],i);
-    }
-}
-
 void show_chat(User* user){
-    if(user != NULL){
-        printf("L'utente %s, ha %d chat%s",user->username, user->num_chat,(user->num_chat>0)?" con:\n":"\n");
-        if(user->num_chat <= 0) {
-            printf("\n");
-            return;
-        }
-        for (int i =0; i < user->num_chat;i++){
-            printf("\tCon %s ha %d chat.\n",user->chat[i].username2,user->chat->num_messages_w2);  
-        } 
-    }
-}
-
-int find_chat_by_other_user(User* user, char* user2){
-    for(int i =0; i < user->num_chat;i++){
-        if(!strcmp(user->chat[i].username2,user2)) return i;
-    }
-    return -1;
-}
-void show_messages(int socket_desc, struct sockaddr_in server_addr,User* user){
-    get_chat(socket_desc,server_addr,user);
-    if(user->num_chat <= 0) {
-        printf("l'utente non ha chat attualmente.\n");
-        return;
-    }
-    char msg_cmd[44],username2[20],server_response[1024];   
-    int msg_len,index;
     
-        printf("Enter username of the user view the chats with: ");
-        reader(username2,MAX_USER_LEN,"utente");        
+    ListItem* aux = user->chats->first;
+    if (aux){
+        int pos = 1;
+        printf("L'utente ha attualmente %d chat:\n",user->num_chat);
 
-        generate_command(username2,NULL,msg_cmd,5);
-        index = find_chat_by_other_user(user, username2);
-        if(index < 0){
-            printf("Non si hanno chat con questo utente\n");
-            return;
+        while(aux){
+            ChatListItem* tmp = (ChatListItem*) aux;
+            printf("\t%d)Ha %d messaggi con l'utente %s\n",pos++,tmp->num_messages,tmp->other_user);
+            aux = aux->next;
         }
-        msg_len = strlen(msg_cmd);
-        sender(msg_cmd,msg_len,socket_desc,server_addr);
-        reciever(server_response,sizeof(server_response), socket_desc);
-        char* tok = strtok(server_response, "\n");
-        for(int i = 0; i < user->chat[index].num_messages_w2;i++){
-            user->chat[index].messages[i] = (char*) malloc(sizeof(char) * strlen(tok));
-            user->chat[index].messages[i] = tok;
-            tok= strtok(NULL,"\n");
-        }
-        free(tok);
-        for(int i = 0; i < user->chat[index].num_messages_w2;i++){
-            
-            char* tok = strtok(user->chat[index].messages[i],"::");
-            char* sender;
-            if(*tok == 's'){
-                sender = malloc(sizeof(char) * strlen(user->username));
-                strcpy(sender,user->username);
-            }
-            else {
-                sender = malloc(sizeof(char) * strlen(username2));
-                strcpy(sender,username2);
-            }
-            tok = strtok(NULL,"::");
-            printf("%s: %s\n",sender,tok);
-        }
+    }
+    else printf("L'utente non ha attualmente chat.\n");
+}
+void show_messages(ChatListItem* chat){
+    if(chat == NULL) return;
+    ListItem* aux = chat->messages->first;
+    while(aux){
+          MessageListItem* tmp = (MessageListItem*) aux;
+          printf("%s\n",tmp->message);
+          aux = aux->next;
+    }
+}
+void send_message(int socket_desc, struct sockaddr_in server_addr, User* user){
+
 }
 int main(int argc, char* argv[]) {
     printTitle();
@@ -222,27 +252,36 @@ int main(int argc, char* argv[]) {
 
     while(1){
         if(user.username != NULL && user.logged){
+            
+
             printf("Sono disponibili le seguenti operazioni:\n");
-            //printf("\t1 - Aggiorna Chat\n");
-            printf("\t1 - Visualizza Messaggi\n");
-            printf("\t2 - Logout\n");
+            printf("\t1 - Visualizza le chat\n");
+            printf("\t2 - Visualizza Messaggi\n");
+            printf("\t3 - Logout\n");
             printf("\t%s per terminare\n",SERVER_COMMAND);
             printf("Inserire un operazione: ");
+
             reader(op,MAX_OPERATION_LEN,"operazione");
             if(!strcmp(SERVER_COMMAND,op)) disconnection(socket_desc);
 
             else if(!strcmp("1",op)){
                 printTitle();
-                show_messages(socket_desc,server_addr,&user);
+                show_chat(&user);
             }
             else if(!strcmp("2",op)){
+                printTitle();
+                printf("hey pustola\n");
+                show_messages(get_messages(socket_desc,server_addr,&user));
+               
+            }
+            
+            else if(!strcmp("3",op)){
                 printTitle();
                 logout(socket_desc,server_addr,&user);
             }
             else{
                 printTitle();
             }
-
         }
         else{
             printf("Benvenuto, sono disponibili le seguenti operazioni:\n");

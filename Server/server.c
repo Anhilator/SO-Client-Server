@@ -872,6 +872,8 @@ void chooseOperation(char buf[], int recv_bytes, struct sockaddr_in client_addr,
         case 6:
         new_chat(buf, recv_bytes, client_addr, sockaddr_len); // crea una nuova chat tra l'utente richiedente e un utente specificato come parametro
         break;
+        case 7:
+        send_message(buf, recv_bytes, client_addr, sockaddr_len);
 		default: 
 		sendRespone("Numero dell'operazione non valido", client_addr, sockaddr_len);
 		break;

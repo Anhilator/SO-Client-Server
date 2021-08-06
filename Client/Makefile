@@ -6,6 +6,7 @@ OBJS=linked_list.o\
 
 HEADERS=linked_list.h\
     client.h\
+	common.h\
 
 
 BINS=client\
