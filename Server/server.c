@@ -874,6 +874,7 @@ void chooseOperation(char buf[], int recv_bytes, struct sockaddr_in client_addr,
         break;
         case 7:
         send_message(buf, recv_bytes, client_addr, sockaddr_len);
+        break;
 		default: 
 		sendRespone("Numero dell'operazione non valido", client_addr, sockaddr_len);
 		break;
@@ -1244,5 +1245,6 @@ void send_message(char buf[], int recv_bytes, struct sockaddr_in client_addr, in
     }
     initMessageInChat(chat, tok); // creo il messaggio
     sendRespone("Message sent succesfully", client_addr, sockaddr_len);
+    printf("num_messages = %d\n",chat->num_messages);
     return;
 }

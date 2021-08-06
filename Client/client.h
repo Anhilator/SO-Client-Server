@@ -41,6 +41,6 @@ void show_messages(ChatListItem* chat);
 void init_user(User* user, char* username, int logged,int socket_desc,struct sockaddr_in server_addr);
 void destroy_user(User* user);
 
-ChatListItem* get_messages(int socket_desc, struct sockaddr_in server_addr,User* user);
+ChatListItem* get_messages(int socket_desc, struct sockaddr_in server_addr,User* user,char* user2);
 void get_all_chats(int socket_desc,struct sockaddr_in server_addr,User* user);
 ChatListItem* find_chat_by_other_user(User* user, char* user2);

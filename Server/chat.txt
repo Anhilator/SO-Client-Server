@@ -1,14 +1,56 @@
 2
-Samuele::Jose::2
+Samuele::Jose::22
 s::ciao Jose
-r::ciao Samu
-Samuele::Lucone::1
+s::ciao
+s::ciao
+s::ciao
+s::panino
+s::coppola
+s::coppola
+s::coppola
+s::coppola
+r::ciao
+r::abba
+r::ciao
+r::Ciaone
+r::HEy
+r::CIcero
+r::come stai
+r::come stai
+r::abba
+r::e
+r::Ciao
+r::panino
+r::Ciaone
+Samuele::Lucone::2
 s::ciao Lu
+s::terrone
 1
-Jose::Samuele::2
+Jose::Samuele::22
 r::ciao Jose
-s::ciao Samu
+r::ciao
+r::ciao
+r::ciao
+r::panino
+r::coppola
+r::coppola
+r::coppola
+r::coppola
+s::ciao
+s::abba
+s::ciao
+s::Ciaone
+s::HEy
+s::CIcero
+s::come stai
+s::come stai
+s::abba
+s::e
+s::Ciao
+s::panino
+s::Ciaone
 1
-Lucone::Samuele::1
+Lucone::Samuele::2
 r::ciao Lu
+r::terrone
 0

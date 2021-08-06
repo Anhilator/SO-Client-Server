@@ -131,4 +131,5 @@ void generate_command(char* arg0, char* arg1,char* cmd,char op){
   else if(op == 3) sprintf(cmd,"%d",op);
   else if(op == 4) sprintf(cmd,"%d",op);
   else if(op == 5) sprintf(cmd,"%d::%s",op,arg0);
+  else if(op == 7) sprintf(cmd,"%d::%s::%s",op,arg0,arg1);
 }
