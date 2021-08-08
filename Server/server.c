@@ -1240,7 +1240,7 @@ void send_message(char buf[], int recv_bytes, struct sockaddr_in client_addr, in
     //cerco la chat nel database
     ChatListItem* chat = ChatListItem_findByUsers(sender, receiver);
     if(chat==NULL){ //chat inesistente
-        sendRespone("The requested chat doesn't exist",client_addr,sockaddr_len);
+        sendRespone(CHAT_DOESNT_EXISTS,client_addr,sockaddr_len);
         return;
     }
     initMessageInChat(chat, tok); // creo il messaggio

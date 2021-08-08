@@ -16,4 +16,6 @@ server e client
 #define LOGOUT_SUCCESS "Logout effettuato con successo"
 #define LOGOUT_FAILURE "Utente non ancora loggato, impossibile effetuare logout"
 
+#define CHAT_DOESNT_EXISTS "La Chat non esiste"
+
 
