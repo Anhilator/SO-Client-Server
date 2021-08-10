@@ -17,5 +17,7 @@ server e client
 #define LOGOUT_FAILURE "Utente non ancora loggato, impossibile effetuare logout"
 
 #define CHAT_DOESNT_EXISTS "La Chat non esiste"
+#define OTHER_USER_DOESNT_EXISTS "Questo utente non esiste, selezionare un utente esistente per iniziare una chat"
+#define MESSAGGE_SUCCESS "Messaggio inviato Correttamente"
 
 

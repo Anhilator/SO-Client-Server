@@ -15,8 +15,8 @@
 
 
 int socket_desc;
-struct sockaddr_in server_addr = {0};
-User user = {0};
+struct sockaddr_in server_addr;
+User user;
 struct termios terminal;
 
 void printTitle(){
@@ -60,6 +60,10 @@ void disconnection(){
     if (DEBUG) fprintf(stderr, "Socket closed...\n");
 
     if (DEBUG) fprintf(stderr, "Exiting...\n");
+    
+    terminal.c_lflag &= ~ECHOCTL; 
+    terminal.c_lflag |= ECHO; 
+    tcsetattr(fileno(stdin),0,&terminal);
 
     exit(EXIT_SUCCESS);
 
@@ -112,6 +116,7 @@ void reader_password(char* buf, size_t buf_size){
 }
 /*Funzione che manda informazioni al server*/
 void sender(char* cmd, int cmd_len){
+
         int bytes_sent, ret;
         bytes_sent=ret=0;
         while ( bytes_sent < cmd_len) {
@@ -142,22 +147,34 @@ void generate_command(char* arg0, char* arg1,char* cmd,char op){
   else if(op == 6) sprintf(cmd,"%d::%s",op,arg0);
   else if(op == 7) sprintf(cmd,"%d::%s::%s",op,arg0,arg1);
 }
-
+void destroy_messages(ChatListItem* chat){
+    while(chat->messages == NULL){
+        ListItem * aux = List_detach(chat->messages,chat->messages->last);
+        free(aux);
+    } 
+}
+void destroy_chats(){
+    while(user.chats == NULL){
+        ListItem* aux = List_detach(user.chats, user.chats->last);
+        destroy_messages((ChatListItem*) aux);
+        free(aux);
+    } 
+}
 void init_user(char* username, int logged){
-    user.username = (char*)malloc(sizeof(char*) * strlen(username)+1);
-    strcpy(user.username, username);
-    user.chats = (ListHead*)malloc(sizeof(ListHead));
     user.logged = logged;
-    get_all_chats(user);
     user.num_chat = 0;
-    
+    user.username = (char*) malloc(sizeof(char*) * strlen(username)+1);
+    strcpy(user.username, username);
+    user.chats = (ListHead*)malloc(sizeof(ListHead)); 
+    get_all_chats(user);
 }
 
 void destroy_user(){
-    free(user.chats);
+    destroy_chats();
     free(user.username);
     user.num_chat = 0;
     user.logged = 0;
+
 }
 
 /*funzione che inserisce le chat nell'utente*/
@@ -216,7 +233,6 @@ ChatListItem* get_messages(char* user2){
     generate_command(username2,NULL,msg_cmd,5);
     c_item = find_chat_by_other_user(username2);
     if(c_item == NULL){
-        printf("Non si hanno chat con questo utente\n");
         return NULL;
     }
     msg_len = strlen(msg_cmd);
@@ -348,33 +364,44 @@ void show_chat(){
     else printf("L'utente non ha attualmente chat.\n");
 }
 void show_messages(ChatListItem* chat){
-    if(chat == NULL) return;
-    ListItem* aux = chat->messages->first;
-    while(aux){
-          MessageListItem* tmp = (MessageListItem*) aux;
-          printf("%s\n",tmp->message);
-          aux = aux->next;
+    if(chat != NULL){
+            ListItem* aux = chat->messages->first;
+            if(aux == NULL){
+                printf("Al momento non sembrano esserci messaggi, mandane qualcuno per vederlo qui.\n");
+                return;
+            }
+            while(aux){
+                MessageListItem* tmp = (MessageListItem*) aux;
+                printf("%s\n",tmp->message);
+                aux = aux->next;
+            }
+    }
+    else {
+                printf("La chat non esiste, creala per vederne i messaggi.\n");
+                return;
     }
 }
-void send_message(char* other_user){
-    char new_msg_cmd[44],msg[50],username2[20],server_response[1024];   
+void send_message(char* other_user,char isa_newchat){
+    char new_msg_cmd[44],msg[MAX_MESSAGE_SIZE],username2[20],server_response[1024];   
     int msg_len;
-    
     if(other_user == NULL){
         printf("Inserire il nome dell'utente a cui si vuole scrivere: ");
         reader(username2,MAX_USER_LEN,"utente");
     
+
+    }
+    else strcpy(username2,other_user);
+    if(!isa_newchat) {    
         printf("Inserire il messaggio da mandare: ");
         reader(msg,MAX_USER_LEN,"messaggio");
     }
-    else strcpy(username2,other_user);
     
     generate_command(username2,msg,new_msg_cmd,7);
     msg_len = strlen(new_msg_cmd);
 
     sender(new_msg_cmd,msg_len);
     reciever(server_response,sizeof(server_response));
-    if(DEBUG) printf("%s\n",server_response);
+    printf("%s\n",server_response);
 
     if(!strcmp(CHAT_DOESNT_EXISTS, server_response)){
         char buf[20];
@@ -388,10 +415,12 @@ void send_message(char* other_user){
 
             if(!strcmp(buf,"1")){
                 new_chat(username2);
-                send_message(username2);
+                send_message(username2,1);
+                printTitle();
                 return;
             }
             else if(!strcmp(buf,"2")){
+                printTitle();
                 return;
             }
         }
@@ -400,7 +429,6 @@ void send_message(char* other_user){
 void new_chat(char* other_user){
     char new_chat_cmd[44],username2[20],server_response[1024];   
     int msg_len;
-    printf("hey sto nel new chat.");
     if(other_user == NULL){
         printf("Inserire il nome dell'utente della chat che si vuole creare: ");
         reader(username2,MAX_USER_LEN,"utente");
@@ -410,33 +438,23 @@ void new_chat(char* other_user){
     }
     
     generate_command(username2,NULL,new_chat_cmd,6);
-    printf("new chat cmd = %s\n",new_chat_cmd);
     msg_len = strlen(new_chat_cmd);
 
     sender(new_chat_cmd,msg_len);
     reciever(server_response,sizeof(server_response));
-    if(DEBUG) printf("%s\n",server_response);
+    printf("%s\n",server_response);
 }
 void clientTerminationHandler(int signum){
     printf("\nRichiesta terminazione, arrivederci alla prossima volta.\n");
-
-    tcgetattr(fileno(stdin), &terminal);
-
-    //riporto il terminale alle condizioni di default.
-
-    terminal.c_lflag &= ~ECHOCTL; 
-    terminal.c_lflag |= ECHO; 
-    tcsetattr(fileno(stdin),0,&terminal);
-    
     if(user.logged == 1)logout();
     disconnection();
-    
-    exit(0);
 }
 
 int main(int argc, char* argv[]) {
-
+    memset(&user,0,sizeof(User));
+    memset(&server_addr,0,sizeof(server_addr));
     //disattivo l'echoing dei segnali.
+
     tcgetattr(fileno(stdin), &terminal);
     terminal.c_lflag |= ECHOCTL;
 
@@ -452,13 +470,11 @@ int main(int argc, char* argv[]) {
 
     connection();
 
-    char op[MAX_OPERATION_LEN],in_chat = 0;
-    char* other_user;
+    char op[MAX_OPERATION_LEN],in_chat = 0, *other_user;
      
 
     while(1){
-        if(user.username != NULL && user.logged && !in_chat){
-
+        if(user.username != NULL && user.logged && !in_chat){// menu principale
             printf("Sono disponibili le seguenti operazioni:\n");
             printf("\t1 - Vai alla sezione delle chat\n");
             printf("\t2 - Invia un nuovo messaggio\n");
@@ -476,8 +492,8 @@ int main(int argc, char* argv[]) {
             }
             else if(!strcmp("2",op)){
                 printTitle();
-                send_message(NULL);
-               
+                send_message(NULL,0);
+            
             }  
             else if(!strcmp("3",op)){
                 printTitle();
@@ -487,13 +503,11 @@ int main(int argc, char* argv[]) {
                 printTitle();
                 logout();
             }
-
-
             else{
                 printTitle();
             }
         }
-        else if(user.username != NULL && user.logged &&in_chat){
+        else if(user.username != NULL && user.logged &&in_chat){// menu delle chat
             get_all_chats();
             show_chat();
             printf("Sono disponibili le seguenti operazioni:\n");
@@ -512,37 +526,37 @@ int main(int argc, char* argv[]) {
                 printTitle();
                 ChatListItem* chat = get_messages(NULL);
                 show_messages(chat);
-                other_user = malloc(sizeof(char) * (strlen(chat->other_user) + 1) );
-                strcpy(other_user, chat->other_user);
-                while(other_user){
-                    printf("Sono disponibili le seguenti operazioni:\n");
-                    printf("\t1 - Manda un nuovo messaggio\n");
-                    printf("\t2 - Torna alle chat\n");
-                    printf("\t%s per terminare\n",SERVER_COMMAND);
-                    printf("Inserire un operazione: ");
-                    reader(op,MAX_OPERATION_LEN,"operazione");
-                    if(!strcmp(SERVER_COMMAND,op)) disconnection();
-                    else if(!strcmp("1",op)){
-                        send_message( other_user);
-                        printTitle();
-                        get_all_chats();
-                        chat = get_messages(other_user);
-                        show_chat();
-                        show_messages(chat);
+                if(chat != NULL){
+                    other_user = malloc(sizeof(char) * (strlen(chat->other_user) + 1) );
+                    strcpy(other_user, chat->other_user);
+                    while(other_user){
+                        printf("Sono disponibili le seguenti operazioni:\n");
+                        printf("\t1 - Manda un nuovo messaggio\n");
+                        printf("\t2 - Torna alle chat\n");
+                        printf("\t%s per terminare\n",SERVER_COMMAND);
+                        printf("Inserire un operazione: ");
+                        reader(op,MAX_OPERATION_LEN,"operazione");
+                        if(!strcmp(SERVER_COMMAND,op)) disconnection();
+                        else if(!strcmp("1",op)){
+                            send_message(other_user,0);
+                            printTitle();
+                            get_all_chats();
+                            chat = get_messages(other_user);
+                            show_chat();
+                            show_messages(chat);
+                        }
+                        else if(!strcmp("2",op)){
+                            printTitle();
+                            other_user = NULL;
+                        }
                     }
-                    else if(!strcmp("2",op)){
-                        printTitle();
-                        other_user = NULL;
-                    }  
+                    free(other_user);
+                    printTitle();                  
                 }
-                free(other_user);
-                printTitle();
             }
             else if(!strcmp("2",op)){
                 printTitle();
-                send_message(NULL);
-                
-               
+                send_message(NULL,0);
             }  
             else if(!strcmp("3",op)){
                 printTitle();
@@ -557,7 +571,7 @@ int main(int argc, char* argv[]) {
                 printTitle();
             }
         }
-        else{
+        else{//menu di benvenuto
             printf("Benvenuto, sono disponibili le seguenti operazioni:\n");
             printf("\t1 - Login\n");
             printf("\t2 - Sign-in\n");

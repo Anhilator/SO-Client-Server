@@ -1175,7 +1175,7 @@ void new_chat(char buf[], int recv_bytes, struct sockaddr_in client_addr, int so
     User* receiver=User_findByUsername(&database.users, buf); //mi prendo il receiver tramite il messaggio del client
     
     if(receiver==NULL){// il receiver non esiste, errore
-        sendRespone("Questo utente non esiste, selezionare un utente esistente per iniziare una chat", client_addr, sockaddr_len);
+        sendRespone(OTHER_USER_DOESNT_EXISTS, client_addr, sockaddr_len);
         return;
     }
     
@@ -1225,7 +1225,7 @@ void send_message(char buf[], int recv_bytes, struct sockaddr_in client_addr, in
     
     if(receiver==NULL){ // se il receiver non c'è allora è un errore
 
-        sendRespone("Receiver doesn't exist, try another receiver", client_addr, sockaddr_len);
+        sendRespone(OTHER_USER_DOESNT_EXISTS, client_addr, sockaddr_len);
         return;
     }
 
@@ -1244,7 +1244,7 @@ void send_message(char buf[], int recv_bytes, struct sockaddr_in client_addr, in
         return;
     }
     initMessageInChat(chat, tok); // creo il messaggio
-    sendRespone("Message sent succesfully", client_addr, sockaddr_len);
+    sendRespone(MESSAGGE_SUCCESS, client_addr, sockaddr_len);
     printf("num_messages = %d\n",chat->num_messages);
     return;
 }

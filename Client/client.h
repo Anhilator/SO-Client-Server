@@ -4,7 +4,6 @@
 #define MAX_PASSWORD_LEN 20
 #define MAX_OPERATION_LEN 6
 #define MAX_MESSAGE_SIZE 1024
-
 /*Un messaggio viene visto come una linked list di stringhe.*/
 typedef struct MessageListITem{
     ListItem item;
@@ -37,7 +36,7 @@ void signin();
 void logout();
 void show_chat();
 void show_messages(ChatListItem* chat);
-void new_chat();
+void new_chat(char* other_user);
 
 void init_user(char* username, int logged);
 void destroy_user();
