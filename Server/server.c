@@ -1012,7 +1012,7 @@ void signin(char buf[], int recv_butes, struct sockaddr_in client_addr, int sock
     }
 
     fprintf(fl, "%s::%s\n", username, password);
-    fprintf(chats, "\n0");
+    fprintf(chats, "0\n");
     fclose(fl);
     fclose(chats);
     return;
