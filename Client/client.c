@@ -221,6 +221,7 @@ ChatListItem* get_messages(char* user2){
     if(user.num_chat <= 0) return NULL;
     char msg_cmd[44],username2[20],server_response[1024];   
     int msg_len;
+    show_chat();
     ChatListItem* c_item=(ChatListItem*) malloc(sizeof(ChatListItem));
     if(user2 == NULL){
         printf("Enter username of the user view the chats with: ");
@@ -533,6 +534,7 @@ int main(int argc, char* argv[]) {
                         printf("Sono disponibili le seguenti operazioni:\n");
                         printf("\t1 - Manda un nuovo messaggio\n");
                         printf("\t2 - Torna alle chat\n");
+                        printf("\t3 - Aggiorna chat \n");
                         printf("\t%s per terminare\n",SERVER_COMMAND);
                         printf("Inserire un operazione: ");
                         reader(op,MAX_OPERATION_LEN,"operazione");
@@ -548,6 +550,13 @@ int main(int argc, char* argv[]) {
                         else if(!strcmp("2",op)){
                             printTitle();
                             other_user = NULL;
+                        }
+                        else if(!strcmp("3",op)){
+                            printTitle();
+                            get_all_chats();
+                            chat = get_messages(other_user);
+                            show_chat();
+                            show_messages(chat);
                         }
                     }
                     free(other_user);
