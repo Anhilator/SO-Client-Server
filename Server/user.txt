@@ -2,10 +2,4 @@ Samuele::password1
 Jose::password2
 Lucone::pass
 Puddi::passw
-Dummy1::1
-
-0Dummy2::2
-
-0Dummy3::3
-
-0
+Enzo::password

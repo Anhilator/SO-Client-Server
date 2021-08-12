@@ -1,4 +1,4 @@
-7
+3
 Samuele::Jose::42
 s::ciao Jose
 s::ciao
@@ -47,18 +47,7 @@ s::ciao Lu
 s::terrone
 Samuele::Puddi::1
 r::Ciao
-Samuele::Samuele::0
-Samuele::Samuele::0
-Samuele::Dummy1::7
-r::1
-r::1
-r::5
-r::5
-r::5
-r::5
-r::5
-Samuele::0Dummy3::0
-5
+2
 Jose::Samuele::42
 r::ciao Jose
 r::ciao
@@ -111,16 +100,6 @@ s::5
 s::ciaoLu
 s::Ciaolullo
 s::Ciao
-Jose::Puddi::1
-s::0Ù1/ý
-Jose::Dummy1::5
-s:: ]¨.
-s::Ciao
-s::5
-r::5
-r::5
-Jose::0Dummy3::1
-s::
 2
 Lucone::Samuele::2
 r::ciao Lu
@@ -134,28 +113,7 @@ r::5
 r::ciaoLu
 r::Ciaolullo
 r::Ciao
-2
+1
 Puddi::Samuele::1
 s::Ciao
-Puddi::Jose::1
-r::0Ù1/ý
-2
-Dummy1::Samuele::7
-s::1
-s::1
-s::5
-s::5
-s::5
-s::5
-s::5
-Dummy1::Jose::5
-r:: ]¨.
-r::Ciao
-r::5
-s::5
-s::5
 0
-2
-0Dummy3::Jose::1
-r::
-0Dummy3::Samuele::0
