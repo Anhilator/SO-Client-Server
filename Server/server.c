@@ -266,6 +266,8 @@ int readFile_Chats(User* user, FILE* chats){
         }
         else{
             sender_chat =chat[0]; //mi prendo la chat del sender da chat
+            free(chat[0]);
+            free(chat[1]);
             free(chat);
         }
         
