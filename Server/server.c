@@ -157,8 +157,8 @@ int fileRead_Database(Database* database){
     fl_size = ftell (users);
     rewind (users);
 
-    buffer = (char*) malloc (sizeof(char)*fl_size);
-    
+    buffer = (char*) malloc (sizeof(char)*fl_size+1);
+    buffer[fl_size] = '\0';
     res = fread (buffer,1,fl_size,users);
     if (res != fl_size) {
         handle_error("Errore in lettura file");
@@ -245,6 +245,8 @@ int readFile_Chats(User* user, FILE* chats){
         tok=strtok(NULL, "::");
         assert(tok && "stringhe nel file di lettura non corrette");
         n_message = atoi(tok);
+        
+
 
         User* symmetric_user =User_findByUsername(&database.users, receiver); //mi accerto che il receiver sia presente nel database
                                                            
@@ -257,27 +259,30 @@ int readFile_Chats(User* user, FILE* chats){
 
         //creo un oggetto chat con i dati ricavati dal file chat
         // inizializzo una chat tra sender e receiver, la funzione mi tornerà le due chat in entrambi i versi
+        
+        printf("Sto per inizializzare la chat di %s e %s \n", user->username, symmetric_user->username);
         ChatListItem** chat= initChat(user, symmetric_user); 
+        printf("inizializzate!");
                                                                 
         ChatListItem* sender_chat;
         if(chat==NULL){// se chat è null, allora la chat già esisteva (significa che abbiamo letto la chat per l'altro utente)
             // allora la otteniamo con una find, dati gli utenti
             sender_chat=ChatListItem_findByUsers(user, symmetric_user);
+         
         }
         else{
-            sender_chat =chat[0]; //mi prendo la chat del sender da chat
-            free(chat[0]);
-            free(chat[1]);
+            sender_chat = chat[0]; //mi prendo la chat del sender da chat
             free(chat);
         }
         
         sender_chat->num_messages=n_message;
 
-        if(DEBUG) printf("\nsto per fare readMessage sulla chat %s-%s %d\n", sender, receiver, n_message);
+        if(1) printf("\nsto per fare readMessage sulla chat %s-%s %d\n\n", sender, receiver, n_message);
         
         for(int i=0; i< sender_chat->num_messages; i++){ // itero sui messaggi
             readOneMessage(sender_chat, chats);
         }
+        
     }
     return num_chats;    
 }
@@ -384,6 +389,7 @@ void deleteChatListItem(ChatListItem* chat){
         List_detach(&(chat->messages), (ListItem*) message);
         deleteMessageListItem(message);
     }
+    free(chat);
 
 }
 
@@ -494,14 +500,11 @@ ChatListItem** initChat(User* sender, User* receiver){
         
     //mi accerto che il sender sia nel database
     data_user = List_find(&(database.users),(ListItem*)sender); 
-    assert(data_user && "user1 not in database");
-
-    if(DEBUG) 
-        printf("certo utente 2 nel database\n");
+    assert(data_user && "sender not in database");
 
     // mi accerto che il receiver sia nel database
     data_user = List_find(&(database.users),(ListItem*)receiver); 
-    assert(data_user && "user2 not in database");
+    assert(data_user && "receiver not in database");
 
     if(ChatListItem_findByUsers(sender, receiver)!=NULL){// se entro nell'if, la chat già esiste
         if(DEBUG) printf("chat tra %s e %s già esiste\n", sender->username, receiver->username);
