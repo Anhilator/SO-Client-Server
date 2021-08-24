@@ -6,3 +6,6 @@ Fernando::cargno
 Angelo::corrado
 Christian::ciao
 Lorenzo::angeluccio
+Josao::p
+billy::mandyu
+pepepe::ce

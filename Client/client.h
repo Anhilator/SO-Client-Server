@@ -1,9 +1,11 @@
 
 #include "linked_list.h"
-#define MAX_USER_LEN 20
-#define MAX_PASSWORD_LEN 20
-#define MAX_OPERATION_LEN 6
-#define MAX_MESSAGE_SIZE 1024
+#define USER_LEN 20
+#define PASS_LEN 20
+#define CMD_LEN 44
+#define OP_LEN 6
+#define RESP_LEN 1024
+#define MAX_MSG_SIZE 10000
 /*Un messaggio viene visto come una linked list di stringhe.*/
 typedef struct MessageListITem{
     ListItem item;

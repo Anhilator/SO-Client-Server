@@ -47,7 +47,7 @@ s::ciao Lu
 s::terrone
 Samuele::Puddi::1
 r::Ciao
-2
+3
 Jose::Samuele::42
 r::ciao Jose
 r::ciao
@@ -100,6 +100,8 @@ s::5
 s::ciaoLu
 s::Ciaolullo
 s::Ciao
+Jose::Josao::1
+s::ciao
 2
 Lucone::Samuele::2
 r::ciao Lu
@@ -119,5 +121,9 @@ s::Ciao
 0
 0
 0
+0
+1
+Josao::Jose::1
+r::ciao
 0
 0
