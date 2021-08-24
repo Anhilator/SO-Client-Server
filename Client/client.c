@@ -54,6 +54,8 @@ void connection(){
 //Funzione che rilascia le risorse nel caso di chiusura
 void disconnection(){
     // chiudo le varie socket
+    if(user.logged == 1)logout();
+
     int ret = close(socket_desc);
     if (ret < 0) handle_error("Cannot close the socket");
 
@@ -64,7 +66,6 @@ void disconnection(){
     terminal.c_lflag &= ~ECHOCTL; 
     terminal.c_lflag |= ECHO; 
     tcsetattr(fileno(stdin),0,&terminal);
-    if(user.logged == 1)logout();
     exit(EXIT_SUCCESS);
 
 }
@@ -196,7 +197,7 @@ void get_all_chats(){
     char** tmp =(char**) malloc(sizeof(char*) * user.num_chat);
     for(int i =0;i < user.num_chat;i++){
         tok = strtok(NULL,"::");
-        tmp[i]= malloc(sizeof(char)* (strlen(tok)+1));
+        tmp[i]=(char*) malloc(sizeof(char)* (strlen(tok)+1));
         strcpy(tmp[i],tok);
     }
     for(int i =0;i < user.num_chat;i++){
@@ -208,6 +209,7 @@ void get_all_chats(){
         tok2 = strtok(NULL,"**");
         c_item->num_messages = atoi(tok2);        
         List_insert(user.chats,(ListItem*)user.chats->last,(ListItem*)c_item);
+        free(tmp[i]);
         }
 }
 /*funzione ausiliaria che dati due utenti controlla se user ha una chat con user2*/
