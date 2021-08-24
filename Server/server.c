@@ -227,7 +227,7 @@ int readFile_Chats(User* user, FILE* chats){
             handle_error("problemi nella fgets");
         }
         strtok(buffer, "\n");
-        if(1) 
+        if(DEBUG) 
             printf("stringa letta: %s\n", buffer);
         
         //uso i delimitatori per estrarre sender, receiver e n_message
@@ -260,9 +260,9 @@ int readFile_Chats(User* user, FILE* chats){
         //creo un oggetto chat con i dati ricavati dal file chat
         // inizializzo una chat tra sender e receiver, la funzione mi tornerà le due chat in entrambi i versi
         
-        printf("Sto per inizializzare la chat di %s e %s \n", user->username, symmetric_user->username);
+        if(DEBUG) printf("Sto per inizializzare la chat di %s e %s \n", user->username, symmetric_user->username);
         ChatListItem** chat= initChat(user, symmetric_user); 
-        printf("inizializzate!");
+        if (DEBUG) printf("inizializzate!");
                                                                 
         ChatListItem* sender_chat;
         if(chat==NULL){// se chat è null, allora la chat già esisteva (significa che abbiamo letto la chat per l'altro utente)
@@ -277,7 +277,7 @@ int readFile_Chats(User* user, FILE* chats){
         
         sender_chat->num_messages=n_message;
 
-        if(1) printf("\nsto per fare readMessage sulla chat %s-%s %d\n\n", sender, receiver, n_message);
+        if(DEBUG) printf("\nsto per fare readMessage sulla chat %s-%s %d\n\n", sender, receiver, n_message);
         
         for(int i=0; i< sender_chat->num_messages; i++){ // itero sui messaggi
             readOneMessage(sender_chat, chats);
