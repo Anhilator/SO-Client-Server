@@ -1,5 +1,5 @@
 3
-Samuele::Jose::42
+Samuele::Jose::45
 s::ciao Jose
 s::ciao
 s::ciao
@@ -42,13 +42,16 @@ r::5
 r::5
 r::Ciao
 r::Ciao
+r::ciao
+r::ciaone
+r::andromeda
 Samuele::Lucone::2
 s::ciao Lu
 s::terrone
 Samuele::Puddi::1
 r::Ciao
-3
-Jose::Samuele::42
+7
+Jose::Samuele::45
 r::ciao Jose
 r::ciao
 r::ciao
@@ -91,6 +94,9 @@ s::5
 s::5
 s::Ciao
 s::Ciao
+s::ciao
+s::ciaone
+s::andromeda
 Jose::Lucone::8
 s::ciao
 s::5
@@ -102,6 +108,13 @@ s::Ciaolullo
 s::Ciao
 Jose::Josao::1
 s::ciao
+Jose::pepepe::0
+Jose::billy::1
+s::ciaone
+Jose::Fernando::1
+s::ciao 
+Jose::Angelo::1
+s::corrado
 2
 Lucone::Samuele::2
 r::ciao Lu
@@ -118,12 +131,19 @@ r::Ciao
 1
 Puddi::Samuele::1
 s::Ciao
-0
-0
+1
+Fernando::Jose::1
+r::ciao 
+1
+Angelo::Jose::1
+r::corrado
 0
 0
 1
 Josao::Jose::1
 r::ciao
-0
-0
+1
+billy::Jose::1
+r::ciaone
+1
+pepepe::Jose::0

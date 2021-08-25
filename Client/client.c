@@ -151,30 +151,44 @@ void generate_command(char* arg0, char* arg1,char* cmd,char op){
 void destroy_messages(ChatListItem* chat){
     while(chat->messages == NULL){
         ListItem * aux = List_detach(chat->messages,chat->messages->last);
+        MessageListItem* tmp = (MessageListItem*) aux;
+        free(tmp->message);
+        free(tmp);
         free(aux);
-    } 
+    }
 }
 void destroy_chats(){
     while(user.chats == NULL){
-        ListItem* aux = List_detach(user.chats, user.chats->last);
+        ListItem* aux = List_detach(user.chats, user.chats->first);
+        ChatListItem* tmp = (ChatListItem*) aux;
         destroy_messages((ChatListItem*) aux);
-        free(aux);
+        free(tmp->messages);
+        free(tmp->other_user);
+        free(tmp);
+        free(aux);   
     } 
 }
 void init_user(char* username, int logged){
-    user.logged = logged;
-    user.num_chat = 0;
+    user.chats = (ListHead*)malloc(sizeof(ListHead));    
+    get_all_chats(user);
     user.username = (char*) malloc(sizeof(char*) * (strlen(username)+1));
     strcpy(user.username, username);
-    user.chats = (ListHead*)malloc(sizeof(ListHead)); 
-    get_all_chats(user);
+    user.logged = logged;
+    user.num_chat = 0;
+    
+    
 }
 
 void destroy_user(){
-    destroy_chats();
+    
+    
     free(user.username);
+    destroy_chats();
+    free(user.chats);
     user.num_chat = 0;
     user.logged = 0;
+    memset(&user,0,sizeof(User));
+
 }
 
 /*funzione che inserisce le chat nell'utente*/
@@ -188,29 +202,39 @@ void get_all_chats(){
     
     char* tok = strtok(server_response,"::");
     List_init(user.chats);
-    if(tok!= NULL)user.num_chat = atoi(tok);
+    
+    if(tok!= NULL && user.num_chat <= atoi(tok)){
+        user.num_chat = atoi(tok);
+        
+    }
     else{
         printf("errore nella lettura della stringa ricevuta\n");
         return;
     }
-    if(user.num_chat == 0) return; 
+        
     char** tmp =(char**) malloc(sizeof(char*) * user.num_chat);
     for(int i =0;i < user.num_chat;i++){
         tok = strtok(NULL,"::");
         tmp[i]=(char*) malloc(sizeof(char)* (strlen(tok)+1));
         strcpy(tmp[i],tok);
     }
+    ChatListItem* c_item; 
     for(int i =0;i < user.num_chat;i++){
-        ChatListItem* c_item = (ChatListItem*) malloc(sizeof(ChatListItem));
+
+        c_item = (ChatListItem*) malloc(sizeof(ChatListItem));
+        memset(c_item,0,sizeof(ChatListItem));
         ((ListItem*)c_item)->prev =((ListItem*)c_item) ->next  =0;
         char* tok2 = strtok(tmp[i],"**");
         c_item->other_user =(char*) malloc(sizeof(char) * (strlen(tok2)+1));
         strcpy(c_item->other_user, tok2);
         tok2 = strtok(NULL,"**");
-        c_item->num_messages = atoi(tok2);        
+        if(tok2!=NULL)c_item->num_messages = atoi(tok2);        
         List_insert(user.chats,(ListItem*)user.chats->last,(ListItem*)c_item);
         free(tmp[i]);
         }
+    free(tmp);
+    
+    
 }
 /*funzione ausiliaria che dati due utenti controlla se user ha una chat con user2*/
 ChatListItem* find_chat_by_other_user(char* user2){
@@ -254,7 +278,6 @@ ChatListItem* get_messages(char* user2){
     char* tok = strtok(server_response, "\n");
     char** tmp = (char**) malloc(sizeof(char*) * c_item->num_messages);        
     for(int i = 0; i < c_item->num_messages;i++){
-
         tmp[i]= malloc(sizeof(char)* (strlen(tok)+1));
         strcpy(tmp[i],tok);
         tok = strtok(NULL,"\n");
@@ -276,9 +299,11 @@ ChatListItem* get_messages(char* user2){
             m_item->message = malloc(sizeof(char*)*(strlen(username2) + strlen(": ") + strlen(tok)));
             sprintf(m_item->message, "%s: %s",username2,tok);
             }
-            List_insert(c_item->messages,c_item->messages->last, (ListItem*) m_item);
+        List_insert(c_item->messages,c_item->messages->last, (ListItem*) m_item);
+        free(tmp[i]);
+
         }
-    
+    free(tmp);
     return c_item;
 }
 
@@ -311,7 +336,6 @@ void login(){
             if(!strcmp(ALREADY_LOGGED, server_response)) printf("%s\n", ALREADY_LOGGED);
             printf("Bentornato nel server, %s.\n", username);
             init_user(username,1);
-            get_all_chats();
             return;
         }
         else{
@@ -359,6 +383,7 @@ void logout(){
     memset(cmd,0,CMD_LEN);
     memset(server_response,0,RESP_LEN);
     generate_command(NULL, NULL, cmd, 4);
+    printf("cmd = %s\n",cmd);
     sender(cmd,sizeof(cmd));
      
     reciever(server_response,RESP_LEN);
