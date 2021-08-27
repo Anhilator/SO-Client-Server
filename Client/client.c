@@ -148,34 +148,33 @@ void generate_command(char* arg0, char* arg1,char* cmd,char op){
   else if(op == 6) sprintf(cmd,"%d::%s",op,arg0);
   else if(op == 7) sprintf(cmd,"%d::%s::%s",op,arg0,arg1);
 }
-void destroy_messages(ChatListItem* chat){
-    while(chat->messages == NULL){
-        ListItem * aux = List_detach(chat->messages,chat->messages->last);
-        MessageListItem* tmp = (MessageListItem*) aux;
+void destroy_messages(ListHead* messages){
+    while(messages->size > 0){
+        MessageListItem* tmp = (MessageListItem*) List_detach(messages,messages->last);
         free(tmp->message);
         free(tmp);
-        free(aux);
     }
 }
 void destroy_chats(){
-    while(user.chats == NULL){
-        ListItem* aux = List_detach(user.chats, user.chats->first);
-        ChatListItem* tmp = (ChatListItem*) aux;
-        destroy_messages((ChatListItem*) aux);
-        free(tmp->messages);
+    while(user.chats->size >0){
+        ChatListItem* tmp = (ChatListItem*)List_detach((&user)->chats, (&user)->chats->first);
+        if(tmp->messages){
+                    destroy_messages(tmp->messages);
+                    free(tmp->messages);
+                    }
         free(tmp->other_user);
         free(tmp);
-        free(aux);   
     } 
 }
 void init_user(char* username, int logged){
     user.chats = (ListHead*)malloc(sizeof(ListHead));    
-    get_all_chats(user);
+   
     user.username = (char*) malloc(sizeof(char*) * (strlen(username)+1));
     strcpy(user.username, username);
     user.logged = logged;
     user.num_chat = 0;
-    
+    List_init(user.chats);
+    get_all_chats(user);
     
 }
 
@@ -191,6 +190,22 @@ void destroy_user(){
 
 }
 
+void chats_update(char* info, ChatListItem* c_item){
+    char* tok2 = strtok(info,"**");
+    tok2 = strtok(NULL,"**");
+    if(tok2!=NULL)c_item->num_messages = atoi(tok2);
+}
+void chats_add(char* info){
+    ChatListItem* c_item = (ChatListItem*) malloc(sizeof(ChatListItem));
+    ((ListItem*)c_item)->prev =((ListItem*)c_item) ->next  =0;
+    char* tok2 = strtok(info,"**");
+    c_item->other_user =(char*) malloc(sizeof(char) * (strlen(tok2)+1));
+    strcpy(c_item->other_user, tok2);
+    tok2 = strtok(NULL,"**");
+    if(tok2!=NULL)c_item->num_messages = atoi(tok2);
+    c_item->messages = NULL;        
+    List_insert(user.chats,(ListItem*)user.chats->last,(ListItem*)c_item);
+}
 /*funzione che inserisce le chat nell'utente*/
 void get_all_chats(){    
     char cmd[CMD_LEN],server_response[RESP_LEN];
@@ -201,38 +216,56 @@ void get_all_chats(){
     reciever(server_response,RESP_LEN);
     
     char* tok = strtok(server_response,"::");
-    List_init(user.chats);
     
+    int old = user.num_chat;
     if(tok!= NULL && user.num_chat <= atoi(tok)){
         user.num_chat = atoi(tok);
         
     }
     else{
-        printf("errore nella lettura della stringa ricevuta\n");
         return;
     }
-        
     char** tmp =(char**) malloc(sizeof(char*) * user.num_chat);
     for(int i =0;i < user.num_chat;i++){
         tok = strtok(NULL,"::");
         tmp[i]=(char*) malloc(sizeof(char)* (strlen(tok)+1));
         strcpy(tmp[i],tok);
     }
-    ChatListItem* c_item; 
-    for(int i =0;i < user.num_chat;i++){
-
-        c_item = (ChatListItem*) malloc(sizeof(ChatListItem));
-        memset(c_item,0,sizeof(ChatListItem));
-        ((ListItem*)c_item)->prev =((ListItem*)c_item) ->next  =0;
-        char* tok2 = strtok(tmp[i],"**");
-        c_item->other_user =(char*) malloc(sizeof(char) * (strlen(tok2)+1));
-        strcpy(c_item->other_user, tok2);
-        tok2 = strtok(NULL,"**");
-        if(tok2!=NULL)c_item->num_messages = atoi(tok2);        
-        List_insert(user.chats,(ListItem*)user.chats->last,(ListItem*)c_item);
-        free(tmp[i]);
+    ChatListItem* c_item;
+     
+    if(old == 0 ){
+        for(int i =0;i < user.num_chat;i++){
+            chats_add(tmp[i]);
+            free(tmp[i]);
+            }
+        free(tmp);
+    }
+    else if(user.num_chat > old){
+        ListItem* aux = user.chats->first;
+        for(int i =0;i < user.num_chat;i++){
+            if(i<old){
+            c_item = (ChatListItem*)aux;
+            chats_update(tmp[i],c_item);
+            free(tmp[i]);
+            aux= aux->next;
+            }
+            else{
+                chats_add(tmp[i]);
+                free(tmp[i]);
+            }
         }
-    free(tmp);
+        free(tmp);
+    }
+    else{
+        ListItem* aux = user.chats->first;
+        for(int i =0;i < user.num_chat;i++){
+            c_item = (ChatListItem*)aux;
+            chats_update(tmp[i],c_item);
+            free(tmp[i]);
+            aux= aux->next;  
+        }
+        free(tmp);
+    }
     
     
 }
@@ -255,7 +288,6 @@ ChatListItem* get_messages(char* user2){
     memset(username2,0,USER_LEN);
     memset(server_response,0,RESP_LEN);
     int msg_len;
-    show_chat();
     ChatListItem* c_item=(ChatListItem*) malloc(sizeof(ChatListItem));
     if(user2 == NULL){
         printf("Enter username of the user view the chats with: ");
@@ -383,7 +415,6 @@ void logout(){
     memset(cmd,0,CMD_LEN);
     memset(server_response,0,RESP_LEN);
     generate_command(NULL, NULL, cmd, 4);
-    printf("cmd = %s\n",cmd);
     sender(cmd,sizeof(cmd));
      
     reciever(server_response,RESP_LEN);

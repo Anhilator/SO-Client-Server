@@ -1,5 +1,5 @@
 CC = gcc
-CCOPTS=--std=gnu99 -Wall
+CCOPTS=--std=gnu99 -Wall -ggdb3
 AR=ar
 
 OBJS=linked_list.o\
