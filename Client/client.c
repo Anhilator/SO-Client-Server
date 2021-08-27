@@ -288,7 +288,6 @@ ChatListItem* get_messages(char* user2){
     memset(username2,0,USER_LEN);
     memset(server_response,0,RESP_LEN);
     int msg_len;
-    ChatListItem* c_item=(ChatListItem*) malloc(sizeof(ChatListItem));
     if(user2 == NULL){
         printf("Enter username of the user view the chats with: ");
         reader(username2,USER_LEN,"utente");
@@ -298,7 +297,7 @@ ChatListItem* get_messages(char* user2){
     }
      
     generate_command(username2,NULL,msg_cmd,5);
-    c_item = find_chat_by_other_user(username2);
+    ChatListItem* c_item = find_chat_by_other_user(username2);
     if(c_item == NULL){
         return NULL;
     }
