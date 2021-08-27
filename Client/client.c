@@ -13,7 +13,6 @@
 #include "client.h"
 #include "linked_list.h"
 
-
 int socket_desc;
 struct sockaddr_in server_addr;
 User user;
@@ -148,20 +147,10 @@ void generate_command(char* arg0, char* arg1,char* cmd,char op){
   else if(op == 6) sprintf(cmd,"%d::%s",op,arg0);
   else if(op == 7) sprintf(cmd,"%d::%s::%s",op,arg0,arg1);
 }
-void destroy_messages(ListHead* messages){
-    while(messages->size > 0){
-        MessageListItem* tmp = (MessageListItem*) List_detach(messages,messages->last);
-        free(tmp->message);
-        free(tmp);
-    }
-}
+
 void destroy_chats(){
     while(user.chats->size >0){
         ChatListItem* tmp = (ChatListItem*)List_detach((&user)->chats, (&user)->chats->first);
-        if(tmp->messages){
-                    destroy_messages(tmp->messages);
-                    free(tmp->messages);
-                    }
         free(tmp->other_user);
         free(tmp);
     } 
@@ -203,7 +192,6 @@ void chats_add(char* info){
     strcpy(c_item->other_user, tok2);
     tok2 = strtok(NULL,"**");
     if(tok2!=NULL)c_item->num_messages = atoi(tok2);
-    c_item->messages = NULL;        
     List_insert(user.chats,(ListItem*)user.chats->last,(ListItem*)c_item);
 }
 /*funzione che inserisce le chat nell'utente*/
@@ -313,24 +301,18 @@ ChatListItem* get_messages(char* user2){
         strcpy(tmp[i],tok);
         tok = strtok(NULL,"\n");
     }
-    c_item->messages = malloc(sizeof(ListHead));
-    List_init(c_item->messages);
+
     for(int i = 0; i < c_item->num_messages;i++){
         tok = strtok(tmp[i],"::");
-        MessageListItem* m_item = (MessageListItem*)malloc(sizeof(MessageListItem));
-        ((ListItem*)m_item)->prev =((ListItem*)m_item) ->next  =0;
 
         if(*tok == 's'){
             tok = strtok(NULL,"::");
-            m_item->message = malloc(sizeof(char*)*(strlen(user.username) + strlen(": ") + strlen(tok)));
-            sprintf(m_item->message, "%s: %s",user.username,tok);
+            printf("%s: %s\n",user.username,tok);
         }
         else {
             tok = strtok(NULL,"::");
-            m_item->message = malloc(sizeof(char*)*(strlen(username2) + strlen(": ") + strlen(tok)));
-            sprintf(m_item->message, "%s: %s",username2,tok);
+            printf("%s: %s\n",username2,tok);
             }
-        List_insert(c_item->messages,c_item->messages->last, (ListItem*) m_item);
         free(tmp[i]);
 
         }
@@ -436,26 +418,7 @@ void show_chat(){
     }
     else printf("L'utente non ha attualmente chat.\n");
 }
-void show_messages(ChatListItem* chat){
-    if(chat != NULL){
-            ListItem* aux = chat->messages->first;
-            if(aux == NULL){
-                printTitle();
-                printf("Al momento non sembrano esserci messaggi, mandane qualcuno per vederlo qui.\n");
-                return;
-            }
-            while(aux){
-                MessageListItem* tmp = (MessageListItem*) aux;
-                printf("%s\n",tmp->message);
-                aux = aux->next;
-            }
-    }
-    else {
-                printTitle();
-                printf("La chat non esiste, creala per vederne i messaggi.\n");
-                return;
-    }
-}
+
 void send_message(char* other_user,char isa_newchat){
     char new_msg_cmd[CMD_LEN],msg[MAX_MSG_SIZE],username2[USER_LEN],server_response[RESP_LEN];  
     memset(new_msg_cmd,0,CMD_LEN);
@@ -466,8 +429,6 @@ void send_message(char* other_user,char isa_newchat){
     if(other_user == NULL){
         printf("Inserire il nome dell'utente a cui si vuole scrivere: ");
         reader(username2,USER_LEN,"utente");
-    
-
     }
     else strcpy(username2,other_user);
     if(!isa_newchat) {    
@@ -561,7 +522,7 @@ int main(int argc, char* argv[]) {
 
     connection();
 
-    char op[OP_LEN],in_chat = 0, *other_user;
+    char op[OP_LEN],in_chat = 0;
      
 
     while(1){
@@ -616,11 +577,9 @@ int main(int argc, char* argv[]) {
             else if(!strcmp("1",op)){
                 printTitle();
                 ChatListItem* chat = get_messages(NULL);
-                show_messages(chat);
                 if(chat != NULL){
-                    other_user = malloc(sizeof(char) * (strlen(chat->other_user) + 1) );
-                    strcpy(other_user, chat->other_user);
-                    while(other_user){
+                    char in_messages= 1;
+                    while(in_messages){
                         printf("Sono disponibili le seguenti operazioni:\n");
                         printf("\t1 - Manda un nuovo messaggio\n");
                         printf("\t2 - Torna alle chat\n");
@@ -630,26 +589,23 @@ int main(int argc, char* argv[]) {
                         reader(op,OP_LEN,"operazione");
                         if(!strcmp(SERVER_COMMAND,op)) disconnection();
                         else if(!strcmp("1",op)){
-                            send_message(other_user,0);
+                            send_message(chat->other_user,0);
                             printTitle();
                             get_all_chats();
-                            chat = get_messages(other_user);
                             show_chat();
-                            show_messages(chat);
+                            chat = get_messages(chat->other_user); 
                         }
                         else if(!strcmp("2",op)){
                             printTitle();
-                            other_user = NULL;
+                            in_messages = 0;
                         }
                         else if(!strcmp("3",op)){
                             printTitle();
                             get_all_chats();
-                            chat = get_messages(other_user);
+                            chat = get_messages(chat->other_user);
                             show_chat();
-                            show_messages(chat);
                         }
                     }
-                    free(other_user);
                     printTitle();                  
                 }
             }

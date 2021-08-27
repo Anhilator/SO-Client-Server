@@ -6,18 +6,13 @@
 #define OP_LEN 6
 #define RESP_LEN 1024
 #define MAX_MSG_SIZE 10000
-/*Un messaggio viene visto come una linked list di stringhe.*/
-typedef struct MessageListITem{
-    ListItem item;
-    char* message;
-}MessageListItem;
 
 /*Una chat viene vista come una linked list.
 Ogni chat contiene due informazioni l'username dell'altro utente (other_user e'
 un char* poiche' come client io devo avere a mia disposizione solo i dati degli utenti loggati)
 e il numero di messaggi che contiene la lista.*/
 typedef struct ChatListItem{
-    ListHead* messages;
+
     ListItem item;
     char* other_user;
     int num_messages;
