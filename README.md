@@ -11,7 +11,7 @@ Per esguire il client;
   - make
   - ./client
 
-Se ci si vuole connettere ad un server in locale, settare la costante SERVER_ADDRESS presente in Client/common.h con l'indirizzo di localhost (127.0.0.1), altrimenti, se si vuole far comunicare il client con un server remoto tramite internet bisognerà cambiare in Client/common.h con l'ip pubblico del server remoto (che sarà diverso di volta in volta).
+Se ci si vuole connettere ad un server in locale, settare la costante SERVER_ADDRESS presente in Client/common.h con l'indirizzo di localhost (127.0.0.1), altrimenti, se si vuole far comunicare il client con un server remoto tramite internet bisognerà cambiare, in Client/common.h, la costante SERVER_ADDRESS con l'ip pubblico del server remoto (che sarà diverso di volta in volta).
 
 Quando si effettuano modifiche e si vuole fare commit, assicurarsi prima di eseguire:
   - cd Server/; make clean; cd ..
