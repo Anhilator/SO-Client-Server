@@ -98,7 +98,7 @@ void startServer(){
     while (1) {
 		
         
-         
+        memset(buf,0,buf_len); //setto il buffer tutto a 0
 
         recv_bytes = 0;
         do {

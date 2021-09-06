@@ -24,4 +24,4 @@ server: server.c $(OBJS)
 
 
 clean:
-	rm -f server
+	rm -rf *.o *~ $(LIBS) $(BINS)

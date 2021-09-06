@@ -24,4 +24,4 @@ client: client.c $(OBJS)
 
 
 clean:
-	rm -f client
+	rm -rf *.o *~ $(LIBS) $(BINS)

@@ -118,7 +118,8 @@ void reader_password(char* buf, size_t buf_size){
 void sender(char* cmd, int cmd_len){
 
         int bytes_sent, ret;
-        bytes_sent=ret=0;
+        bytes_sent=0;
+        ret=0;
         while ( bytes_sent < cmd_len) {
             if(cmd != NULL)ret = sendto(socket_desc, cmd,(size_t) cmd_len, 0, (struct sockaddr*) &server_addr, (socklen_t)sizeof(struct sockaddr_in));
             if (ret == -1 && errno == EINTR) continue;
@@ -433,7 +434,7 @@ void send_message(char* other_user,char isa_newchat){
     else strcpy(username2,other_user);
     if(!isa_newchat) {    
         printf("Inserire il messaggio da mandare: ");
-        reader(msg,USER_LEN,"messaggio");
+        reader(msg,MAX_MSG_SIZE,"messaggio");
     }
     if(!strcmp(username2, user.username)) {
         printf("Non si puo' mandare un messaggio a se stessi\n");

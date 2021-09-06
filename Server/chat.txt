@@ -1,4 +1,4 @@
-3
+4
 Samuele::Jose::46
 s::ciao Jose
 s::ciao
@@ -51,7 +51,13 @@ s::ciao Lu
 s::terrone
 Samuele::Puddi::1
 r::Ciao
-7
+Samuele::luca::5
+s::reeeeeed beeeeeen 
+r::clempson
+s::123456789012345678
+s::aa
+s::123456789012345678901234567890
+8
 Jose::Samuele::46
 r::ciao Jose
 r::ciao
@@ -117,6 +123,8 @@ Jose::Fernando::1
 s::ciao 
 Jose::Angelo::1
 s::corrado
+Jose::luca::1
+s::123456789012345678
 2
 Lucone::Samuele::2
 r::ciao Lu
@@ -149,3 +157,12 @@ billy::Jose::1
 r::ciaone
 1
 pepepe::Jose::0
+2
+luca::Samuele::5
+r::reeeeeed beeeeeen 
+s::clempson
+r::123456789012345678
+r::aa
+r::123456789012345678901234567890
+luca::Jose::1
+r::123456789012345678
