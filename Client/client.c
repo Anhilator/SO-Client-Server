@@ -401,7 +401,6 @@ void logout(){
      
     reciever(server_response,RESP_LEN);
     if(!strcmp(server_response,LOGOUT_SUCCESS)) destroy_user();
-    if(DEBUG) printf("%s\n",server_response);
 
 }
 void show_chat(){
@@ -495,7 +494,6 @@ void new_chat(char* other_user){
 
     sender(new_chat_cmd,msg_len);
     reciever(server_response,RESP_LEN);
-    printf("username2 = %s\n",username2);
     printf("il server risponde %s\n",server_response);
 }
 void clientTerminationHandler(int signum){
@@ -567,7 +565,8 @@ int main(int argc, char* argv[]) {
             printf("\t1 - Visualizza messaggi\n");
             printf("\t2 - Invia un nuovo messaggio\n");
             printf("\t3 - Crea una nuova chat\n");
-            printf("\t4 - Torna indietro\n");
+            printf("\t4 - Aggiorna Chat\n");
+            printf("\t5 - Torna indietro\n");
 
             printf("\t%s per terminare\n",SERVER_COMMAND);
             printf("Inserire un operazione: ");
@@ -604,7 +603,6 @@ int main(int argc, char* argv[]) {
                             printTitle();
                             get_all_chats();
                             chat = get_messages(chat->other_user);
-                            show_chat();
                         }
                     }
                     printTitle();                  
@@ -619,6 +617,11 @@ int main(int argc, char* argv[]) {
                 new_chat(NULL);
             }
             else if(!strcmp("4",op)){
+                printTitle();
+                get_all_chats();
+                show_chat();
+            }
+            else if(!strcmp("5",op)){
                 printTitle();
                 in_chat = 0;
             }
