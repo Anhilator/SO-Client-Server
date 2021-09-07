@@ -699,6 +699,7 @@ void sendRespone(char buf[], struct sockaddr_in client_addr, int sockaddr_len){
         if(ret==-1) handle_error("ERRORE NELLA SENDTO"); 
         bytes_sent=ret; 
     }
+    if(DEBUG) printf("bytes_sent = %d \n");
 
 }
 
@@ -800,7 +801,7 @@ void User_print(User* user){
     assert(user && "argomento User_print è NULL");
 
     printf("Username: %s\n", user->username);
-    printf("Password: %s\n", user->password);
+    if(DEBUG) printf("Password: %s\n", user->password);
     printf("logged: %d\n", user->logged);
 
     return;
@@ -813,7 +814,7 @@ void Database_printUser(){
         User* user=(User*)list;
         User_print(user); // stampa dei dati del singolo utente
         
-        printf("\n\n");
+        printf("\n");
         list=list->next;
     }
     return;
@@ -848,12 +849,11 @@ void chooseOperation(char buf[], int recv_bytes, struct sockaddr_in client_addr,
     //converto il char che indica l'operazione in intero
     int op = buf[0] - '0';
 
-    printf("buf before = %s \n", buf);
+    printf("request received = %s \n", buf);
 
     buf += 3;
     recv_bytes -=3;
-    
-    printf("buf after = %s \n", buf);
+
 
     switch (op)
 	{
