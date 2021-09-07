@@ -699,7 +699,7 @@ void sendRespone(char buf[], struct sockaddr_in client_addr, int sockaddr_len){
         if(ret==-1) handle_error("ERRORE NELLA SENDTO"); 
         bytes_sent=ret; 
     }
-    if(DEBUG) printf("bytes_sent = %d \n");
+    if(DEBUG) printf("bytes_sent = %d \n", bytes_sent);
 
 }
 
